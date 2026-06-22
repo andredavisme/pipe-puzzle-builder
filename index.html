@@ -36,7 +36,6 @@
     #share-bar { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; }
     #share-bar a { color: #e2c97e; }
     #loading-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #e2c97e; z-index: 999; }
-    /* ── Hover tooltip ── */
     #piece-tooltip {
       position: fixed;
       pointer-events: none;
@@ -120,7 +119,6 @@
   let dragging = null;
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
-  // ── Tooltip helpers ──────────────────────────────────────────────────────
   const tooltip = document.getElementById('piece-tooltip');
   function showTooltip(e, pl) {
     const piece = pieces.find(p => p.id === pl.pieceId);
@@ -146,7 +144,6 @@
   }
   function hideTooltip() { tooltip.style.display = 'none'; }
 
-  // ── Load catalog ─────────────────────────────────────────────────────────
   async function loadCatalog() {
     const [sizes, cats, pcs, pSizes] = await Promise.all([
       sbFetch('pipe_nominal_sizes?order=id'),
@@ -184,7 +181,6 @@
     return pieceSizes.find(r => r.piece_id === pieceId && r.nominal_size_id === nomId && r.is_active !== false);
   }
 
-  // ── SVG generation ───────────────────────────────────────────────────────
   const SCALE = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.25, 5: 1.5, 6: 2.0 };
 
   function metalGradDef(id) {
@@ -236,7 +232,6 @@
     return fittingSVG(nomId, piece.piece_type);
   }
 
-  // ── Sidebar ───────────────────────────────────────────────────────────────
   function buildSidebar(cats, catMap) {
     const sb = document.getElementById('sidebar');
     sb.innerHTML = '';
@@ -268,7 +263,6 @@
     });
   }
 
-  // ── Canvas rendering ──────────────────────────────────────────────────────
   function renderDotGrid() {
     const dg = document.getElementById('dotgrid');
     const W = dg.clientWidth, H = dg.clientHeight;
@@ -326,7 +320,6 @@
     updateBOM();
   }
 
-  // ── BOM ───────────────────────────────────────────────────────────────────
   function updateBOM() {
     const bar = document.getElementById('bom-bar');
     bar.querySelectorAll('.bom-item').forEach(el => el.remove());
@@ -345,7 +338,6 @@
     });
   }
 
-  // ── Drop on canvas ────────────────────────────────────────────────────────
   const canvasWrap = document.getElementById('canvas-wrap');
   canvasWrap.addEventListener('dragover', e => e.preventDefault());
   canvasWrap.addEventListener('drop', e => {
@@ -359,7 +351,6 @@
     renderAll();
   });
 
-  // ── Drag placed pieces ────────────────────────────────────────────────────
   document.addEventListener('mousemove', e => {
     if (!dragging || dragging.type !== 'placed') return;
     const dx = (e.clientX - dragging.startX) / zoom;
@@ -374,7 +365,6 @@
     if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
   });
 
-  // ── Pan & zoom ────────────────────────────────────────────────────────────
   let panning = false, panStart = {};
   canvasWrap.addEventListener('wheel', e => {
     e.preventDefault();
@@ -395,7 +385,6 @@
   });
   document.addEventListener('mouseup', () => { panning = false; });
 
-  // ── Toolbar buttons ───────────────────────────────────────────────────────
   function rotateSel(deg) {
     if (!selected) return;
     const pl = placed.find(p => p.id === selected);
@@ -418,7 +407,6 @@
   document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.2, zoom * 0.8); renderAll(); };
   document.getElementById('btn-clear').onclick = () => { if (confirm('Clear canvas?')) { placed = []; selected = null; renderAll(); } };
 
-  // ── Export ────────────────────────────────────────────────────────────────
   document.getElementById('export-btn').onclick = () => {
     const counts = {};
     placed.forEach(pl => {
@@ -454,15 +442,19 @@
         body: JSON.stringify({ share_token: token }),
         prefer: 'return=representation'
       });
-      const rows = placed.map(pl => ({
-        assembly_id: assembly.id,
-        piece_id: pl.pieceId,
-        nominal_size_id: pl.nomId,
-        x: Math.round(pl.x),
-        y: Math.round(pl.y),
-        rotation: pl.rotation || 0,
-        flipped: pl.flipped || false
-      }));
+      const rows = placed.map(pl => {
+        const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
+        return {
+          assembly_id: assembly.id,
+          piece_size_id: psRow.id,
+          piece_id: pl.pieceId,
+          nominal_size_id: pl.nomId,
+          pos_x: Math.round(pl.x),
+          pos_y: Math.round(pl.y),
+          rotation_deg: pl.rotation || 0,
+          flipped: pl.flipped || false
+        };
+      });
       if (rows.length) {
         await sbFetch('pipe_assembly_pieces', {
           method: 'POST',
@@ -489,8 +481,9 @@
         id: nextId++,
         pieceId: r.piece_id,
         nomId: r.nominal_size_id,
-        x: r.x, y: r.y,
-        rotation: r.rotation || 0,
+        x: r.pos_x,
+        y: r.pos_y,
+        rotation: r.rotation_deg || 0,
         flipped: r.flipped || false
       }));
     } catch(e) { console.warn('Could not load shared assembly', e); }
