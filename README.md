@@ -22,6 +22,8 @@ An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe 
 |---|---|---|
 | **Indian Club** | A [club-shaped exercise tool](https://en.wikipedia.org/wiki/Indian_club) swung for shoulder mobility and strength — classic gym equipment made from pipe fittings | [Open design →](https://andredavisme.github.io/pipe-puzzle-builder/?s=0c3d4fb0762631ba) |
 
+> ✨ **Try it:** The end cap on the 18" pipe is intentionally missing. Drag a **Cap** from the sidebar onto the open end to complete the club, then hit **Export List** to see the full parts list with SKUs and pricing.
+
 ## Piece Catalog
 
 | Category | Pieces |
