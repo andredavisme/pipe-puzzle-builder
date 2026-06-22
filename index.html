@@ -74,7 +74,7 @@
 <script type="module">
   // ── Supabase config ──────────────────────────────────────────────────────
   const SUPABASE_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
-  const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'; // replace with publishable key
+  const SUPABASE_ANON_KEY = 'sb_publishable_haKvwV0M7KMj4Qz69M6WGg_KmIfU-aI';
 
   async function sbFetch(path, opts = {}) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -202,14 +202,12 @@
   function buildSidebar(cats, catMap) {
     const sb = document.getElementById('sidebar');
     sb.innerHTML = '';
-    // Group pieces by category
     const groups = {};
     pieces.forEach(p => {
       const cid = p.category_id;
       if (!groups[cid]) groups[cid] = [];
       groups[cid].push(p);
     });
-    // Render each category
     Object.entries(groups).forEach(([cid, pcs]) => {
       const lbl = document.createElement('div');
       lbl.className = 'cat-label';
@@ -217,7 +215,7 @@
       sb.appendChild(lbl);
       pcs.forEach(p => {
         const psRow = getPieceSizeRow(p.id, activeNomId);
-        if (!psRow) return; // not available in this size
+        if (!psRow) return;
         const btn = document.createElement('div');
         btn.className = 'piece-btn';
         btn.draggable = true;
@@ -266,7 +264,6 @@
       if (pl.rotation) tfm += ` rotate(${pl.rotation},${w/2},${h/2})`;
       if (pl.flipped) tfm += ` scale(-1,1) translate(${-w},0)`;
       grp.setAttribute('transform', tfm);
-      // Selection border
       const border = document.createElementNS(SVG_NS, 'rect');
       border.setAttribute('class', 'sel-border');
       border.setAttribute('x', -3); border.setAttribute('y', -3);
@@ -274,7 +271,6 @@
       border.setAttribute('rx', 4); border.setAttribute('fill', 'none');
       if (selected === pl.id) border.setAttribute('stroke', '#e2c97e');
       grp.appendChild(border);
-      // Inline SVG content
       Array.from(inner.childNodes).forEach(n => grp.appendChild(n.cloneNode(true)));
       grp.addEventListener('mousedown', e => {
         e.stopPropagation();
@@ -291,7 +287,6 @@
   // ── BOM ───────────────────────────────────────────────────────────────────
   function updateBOM() {
     const bar = document.getElementById('bom-bar');
-    // Remove old items
     bar.querySelectorAll('.bom-item').forEach(el => el.remove());
     const counts = {};
     placed.forEach(pl => {
