@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipe Puzzle Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    header { background: #16213e; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #0f3460; }
+    header h1 { font-size: 1.1rem; color: #e2c97e; letter-spacing: 1px; }
+    #size-tabs { display: flex; gap: 6px; margin-left: auto; }
+    .size-tab { padding: 4px 10px; border: 1px solid #0f3460; border-radius: 4px; background: #0f3460; color: #aaa; cursor: pointer; font-size: 0.8rem; transition: all .15s; }
+    .size-tab.active { background: #e2c97e; color: #1a1a2e; border-color: #e2c97e; font-weight: 700; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #sidebar { width: 200px; background: #16213e; border-right: 2px solid #0f3460; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .cat-label { font-size: 0.7rem; color: #e2c97e; text-transform: uppercase; letter-spacing: 1px; padding: 4px 2px 2px; border-top: 1px solid #0f3460; margin-top: 4px; }
+    .cat-label:first-child { border-top: none; margin-top: 0; }
+    .piece-btn { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #0f3460; border: 1px solid #1a4a7a; border-radius: 6px; cursor: grab; transition: background .15s; user-select: none; }
+    .piece-btn:hover { background: #1a5a9a; }
+    .piece-btn svg { flex-shrink: 0; }
+    .piece-btn span { font-size: 0.75rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0f0f1e; }
+    #canvas-wrap svg#dotgrid { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .placed-piece { cursor: pointer; }
+    .placed-piece.selected > rect.sel-border { stroke: #e2c97e; stroke-width: 2; fill: none; }
+    #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+    .tb-btn { padding: 5px 10px; background: #16213e; border: 1px solid #0f3460; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.8rem; }
+    .tb-btn:hover { background: #0f3460; }
+    #bom-bar { background: #16213e; border-top: 2px solid #0f3460; padding: 6px 14px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; min-height: 36px; }
+    #bom-bar span { font-size: 0.75rem; color: #aaa; }
+    #bom-bar .bom-item { background: #0f3460; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; color: #e2c97e; }
+    #export-btn, #save-btn { margin-left: auto; padding: 4px 12px; background: #e2c97e; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    #save-btn { background: #4CAF50; color: #fff; margin-left: 6px; }
+    #share-bar { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; }
+    #share-bar a { color: #e2c97e; }
+    #loading-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #e2c97e; z-index: 999; }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">Loading catalog…</div>
+
+<header>
+  <h1>🔧 Pipe Puzzle Builder</h1>
+  <div id="size-tabs"></div>
+</header>
+
+<div id="main">
+  <div id="sidebar"></div>
+  <div id="canvas-wrap">
+    <svg id="dotgrid"></svg>
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="toolbar">
+      <button class="tb-btn" id="btn-rotate-ccw" title="Rotate CCW">↺</button>
+      <button class="tb-btn" id="btn-rotate-cw" title="Rotate CW">↻</button>
+      <button class="tb-btn" id="btn-flip" title="Flip 180°">⇅</button>
+      <button class="tb-btn" id="btn-delete" title="Delete">🗑</button>
+      <button class="tb-btn" id="btn-zoom-in">＋</button>
+      <button class="tb-btn" id="btn-zoom-out">－</button>
+      <button class="tb-btn" id="btn-clear" title="Clear canvas">Clear</button>
+    </div>
+    <div id="share-bar">Saved! Share: <a id="share-link" href="#" target="_blank"></a></div>
+  </div>
+</div>
+
+<div id="bom-bar">
+  <span>Parts List:</span>
+  <button id="export-btn">Export List</button>
+  <button id="save-btn">💾 Save &amp; Share</button>
+</div>
+
+<script type="module">
+  // ── Supabase config ──────────────────────────────────────────────────────
+  const SUPABASE_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'; // replace with publishable key
+
+  async function sbFetch(path, opts = {}) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...opts,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: opts.prefer || 'return=representation',
+        ...opts.headers
+      }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let nominalSizes = [];
+  let pieces = [];
+  let pieceSizes = [];  // all rows from pipe_piece_sizes
+  let activeNomId = 1; // default ½"
+  let placed = [];      // {id, pieceId, nomId, x, y, rotation, flipped}
+  let selected = null;
+  let nextId = 1;
+  let zoom = 1;
+  let panX = 0, panY = 0;
+  let dragging = null; // {type:'sidebar'|'placed', ...}
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // ── Load catalog ─────────────────────────────────────────────────────────
+  async function loadCatalog() {
+    const [sizes, cats, pcs, pSizes] = await Promise.all([
+      sbFetch('pipe_nominal_sizes?order=id'),
+      sbFetch('pipe_categories?order=id'),
+      sbFetch('pipe_pieces?order=id&select=id,slug,piece_type,label,length_in,category_id'),
+      sbFetch('pipe_piece_sizes?order=piece_id,nominal_size_id&select=id,piece_id,nominal_size_id,sku,unit_cost_usd,is_active')
+    ]);
+    nominalSizes = sizes;
+    pieces = pcs;
+    pieceSizes = pSizes;
+    // Build size tabs
+    const tabWrap = document.getElementById('size-tabs');
+    sizes.forEach(s => {
+      const b = document.createElement('button');
+      b.className = 'size-tab' + (s.id === activeNomId ? ' active' : '');
+      b.textContent = s.label;
+      b.dataset.id = s.id;
+      b.addEventListener('click', () => setNominalSize(s.id));
+      tabWrap.appendChild(b);
+    });
+    // Map cats
+    const catMap = {}; cats.forEach(c => catMap[c.id] = c);
+    // Build sidebar
+    buildSidebar(cats, catMap);
+    // Check for shared assembly
+    const params = new URLSearchParams(location.search);
+    if (params.get('s')) await loadAssembly(params.get('s'));
+    document.getElementById('loading-overlay').style.display = 'none';
+  }
+
+  function setNominalSize(id) {
+    activeNomId = id;
+    document.querySelectorAll('.size-tab').forEach(b => b.classList.toggle('active', +b.dataset.id === id));
+    buildSidebar();
+    renderAll();
+  }
+
+  function getPieceSizeRow(pieceId, nomId) {
+    return pieceSizes.find(r => r.piece_id === pieceId && r.nominal_size_id === nomId && r.is_active !== false);
+  }
+
+  // ── SVG generation ───────────────────────────────────────────────────────
+  const SCALE = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.25, 5: 1.5, 6: 2.0 };
+
+  function metalGradDef(id) {
+    return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8cfd4"/><stop offset="40%" stop-color="#9aa5ad"/><stop offset="100%" stop-color="#6b7880"/></linearGradient></defs>`;
+  }
+
+  function pipeSVG(nomId, lengthIn) {
+    const s = SCALE[nomId] || 1;
+    const od = Math.round(14 * s);
+    const len = Math.round(lengthIn * 4 * s);
+    const w = len + 20, h = od + 16;
+    const gid = `mg${nomId}p${lengthIn}`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      ${metalGradDef(gid)}
+      <rect x="8" y="4" width="${len+4}" height="${od+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>
+      <rect x="2" y="6" width="10" height="${od+4}" rx="2" fill="#7a8890" stroke="#444" stroke-width=".5"/>
+      <rect x="${w-12}" y="6" width="10" height="${od+4}" rx="2" fill="#7a8890" stroke="#444" stroke-width=".5"/>
+      <rect x="10" y="6" width="${len}" height="4" rx="1" fill="rgba(255,255,255,0.18)"/>
+    </svg>`;
+  }
+
+  function fittingSVG(nomId, type) {
+    const s = SCALE[nomId] || 1;
+    const b = Math.round(20 * s);
+    const gid = `mgf${nomId}${type}`;
+    const shapes = {
+      coupling:     `<rect x="4" y="${8-b/4}" width="${b+8}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+      cap:          `<rect x="4" y="${8-b/4}" width="${b*0.6}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${4+b*0.6-2}" y="${8-b/4}" width="6" height="${b/2+8}" fill="#7a8890" stroke="#444" stroke-width=".5"/>`,
+      elbow90:      `<path d="M4,${b+4} L4,8 Q4,4 8,4 L${b+4},4" stroke="url(#${gid})" stroke-width="${b/2}" fill="none" stroke-linecap="round"/>`,
+      elbow45:      `<path d="M4,${b+4} L4,${b/2+4} Q4,4 ${b/2+4},4 L${b+4},4" stroke="url(#${gid})" stroke-width="${b/2}" fill="none" stroke-linecap="round"/>`,
+      tee:          `<rect x="4" y="${b/2}" width="${b*2}" height="${b/2+4}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${b+2}" y="4" width="${b/2+4}" height="${b/2}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+      cross:        `<rect x="4" y="${b/2}" width="${b*2+8}" height="${b/2+4}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${b+2}" y="4" width="${b/2+4}" height="${b*2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+      union:        `<rect x="4" y="${8-b/4}" width="${b+8}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><line x1="${(b+16)/2}" y1="${8-b/4}" x2="${(b+16)/2}" y2="${8+b/4+8}" stroke="#444" stroke-width="2"/>`,
+      nipple:       `<rect x="2" y="${8-b/6}" width="${b+12}" height="${b/3+6}" rx="2" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+      flange:       `<rect x="2" y="2" width="${b+12}" height="${b+12}" rx="4" fill="url(#${gid})" stroke="#555" stroke-width="1"/><circle cx="${(b+16)/2}" cy="${(b+16)/2}" r="${b/4}" fill="none" stroke="#444" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="#555"/><circle cx="${b+10}" cy="6" r="2" fill="#555"/><circle cx="6" cy="${b+10}" r="2" fill="#555"/><circle cx="${b+10}" cy="${b+10}" r="2" fill="#555"/>`,
+      reducer:      `<polygon points="4,${8-b/4} ${b*1.5},${8-b/6} ${b*1.5},${8+b/6+8} 4,${8+b/4+8}" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+      'reducer-coupling': `<polygon points="4,${8-b/4} ${b*1.5},${8-b/6} ${b*1.5},${8+b/6+8} 4,${8+b/4+8}" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
+    };
+    const shape = shapes[type] || shapes.coupling;
+    const vw = b * 2.5 + 16, vh = b * 2.5 + 16;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" viewBox="0 0 ${vw} ${vh}">
+      ${metalGradDef(gid)}
+      ${shape}
+    </svg>`;
+  }
+
+  function makeSVG(piece, nomId) {
+    if (piece.piece_type === 'pipe') return pipeSVG(nomId, piece.length_in || 6);
+    return fittingSVG(nomId, piece.piece_type);
+  }
+
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  function buildSidebar(cats, catMap) {
+    const sb = document.getElementById('sidebar');
+    sb.innerHTML = '';
+    // Group pieces by category
+    const groups = {};
+    pieces.forEach(p => {
+      const cid = p.category_id;
+      if (!groups[cid]) groups[cid] = [];
+      groups[cid].push(p);
+    });
+    // Render each category
+    Object.entries(groups).forEach(([cid, pcs]) => {
+      const lbl = document.createElement('div');
+      lbl.className = 'cat-label';
+      lbl.textContent = catMap ? (catMap[cid]?.name || 'Other') : 'Pieces';
+      sb.appendChild(lbl);
+      pcs.forEach(p => {
+        const psRow = getPieceSizeRow(p.id, activeNomId);
+        if (!psRow) return; // not available in this size
+        const btn = document.createElement('div');
+        btn.className = 'piece-btn';
+        btn.draggable = true;
+        btn.dataset.pieceId = p.id;
+        btn.innerHTML = `${makeSVG(p, activeNomId)}<span>${p.label || p.slug}${psRow.unit_cost_usd ? ' — $' + Number(psRow.unit_cost_usd).toFixed(2) : ''}</span>`;
+        btn.addEventListener('dragstart', e => {
+          dragging = { type: 'sidebar', pieceId: p.id };
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+        sb.appendChild(btn);
+      });
+    });
+  }
+
+  // ── Canvas rendering ──────────────────────────────────────────────────────
+  function renderDotGrid() {
+    const dg = document.getElementById('dotgrid');
+    const W = dg.clientWidth, H = dg.clientHeight;
+    const step = 20;
+    let dots = '';
+    for (let x = 0; x < W; x += step)
+      for (let y = 0; y < H; y += step)
+        dots += `<circle cx="${x}" cy="${y}" r="1" fill="#1e2a3a"/>`;
+    dg.innerHTML = dots;
+  }
+
+  function renderAll() {
+    const cvs = document.getElementById('canvas');
+    cvs.innerHTML = '';
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+    placed.forEach(pl => {
+      const piece = pieces.find(p => p.id === pl.pieceId);
+      if (!piece) return;
+      const svgStr = makeSVG(piece, pl.nomId);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+      const inner = doc.documentElement;
+      const w = +inner.getAttribute('width') || 40;
+      const h = +inner.getAttribute('height') || 40;
+      const grp = document.createElementNS(SVG_NS, 'g');
+      grp.setAttribute('class', 'placed-piece' + (selected === pl.id ? ' selected' : ''));
+      grp.setAttribute('data-id', pl.id);
+      const cx = pl.x, cy = pl.y;
+      let tfm = `translate(${cx},${cy})`;
+      if (pl.rotation) tfm += ` rotate(${pl.rotation},${w/2},${h/2})`;
+      if (pl.flipped) tfm += ` scale(-1,1) translate(${-w},0)`;
+      grp.setAttribute('transform', tfm);
+      // Selection border
+      const border = document.createElementNS(SVG_NS, 'rect');
+      border.setAttribute('class', 'sel-border');
+      border.setAttribute('x', -3); border.setAttribute('y', -3);
+      border.setAttribute('width', w + 6); border.setAttribute('height', h + 6);
+      border.setAttribute('rx', 4); border.setAttribute('fill', 'none');
+      if (selected === pl.id) border.setAttribute('stroke', '#e2c97e');
+      grp.appendChild(border);
+      // Inline SVG content
+      Array.from(inner.childNodes).forEach(n => grp.appendChild(n.cloneNode(true)));
+      grp.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        selected = pl.id;
+        dragging = { type: 'placed', id: pl.id, startX: e.clientX, startY: e.clientY, origX: pl.x, origY: pl.y };
+        renderAll();
+      });
+      g.appendChild(grp);
+    });
+    cvs.appendChild(g);
+    updateBOM();
+  }
+
+  // ── BOM ───────────────────────────────────────────────────────────────────
+  function updateBOM() {
+    const bar = document.getElementById('bom-bar');
+    // Remove old items
+    bar.querySelectorAll('.bom-item').forEach(el => el.remove());
+    const counts = {};
+    placed.forEach(pl => {
+      const piece = pieces.find(p => p.id === pl.pieceId);
+      const nom = nominalSizes.find(n => n.id === pl.nomId);
+      const key = `${nom?.label || ''} ${piece?.label || piece?.slug || ''}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    Object.entries(counts).forEach(([k, v]) => {
+      const span = document.createElement('span');
+      span.className = 'bom-item';
+      span.textContent = `${k} × ${v}`;
+      document.getElementById('export-btn').before(span);
+    });
+  }
+
+  // ── Drop on canvas ────────────────────────────────────────────────────────
+  const canvasWrap = document.getElementById('canvas-wrap');
+  canvasWrap.addEventListener('dragover', e => e.preventDefault());
+  canvasWrap.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!dragging || dragging.type !== 'sidebar') return;
+    const rect = canvasWrap.getBoundingClientRect();
+    const x = (e.clientX - rect.left - panX) / zoom;
+    const y = (e.clientY - rect.top - panY) / zoom;
+    placed.push({ id: nextId++, pieceId: dragging.pieceId, nomId: activeNomId, x, y, rotation: 0, flipped: false });
+    dragging = null;
+    renderAll();
+  });
+
+  // ── Drag placed pieces ────────────────────────────────────────────────────
+  document.addEventListener('mousemove', e => {
+    if (!dragging || dragging.type !== 'placed') return;
+    const dx = (e.clientX - dragging.startX) / zoom;
+    const dy = (e.clientY - dragging.startY) / zoom;
+    const pl = placed.find(p => p.id === dragging.id);
+    if (pl) { pl.x = dragging.origX + dx; pl.y = dragging.origY + dy; }
+    renderAll();
+  });
+  document.addEventListener('mouseup', () => { if (dragging?.type === 'placed') dragging = null; });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'r' || e.key === 'R') rotateSel(15);
+    if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
+  });
+
+  // ── Pan & zoom ────────────────────────────────────────────────────────────
+  let panning = false, panStart = {};
+  canvasWrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoom = Math.max(0.2, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+    renderAll();
+  }, { passive: false });
+  canvasWrap.addEventListener('mousedown', e => {
+    if (e.target === document.getElementById('canvas') || e.target.closest('#dotgrid')) {
+      panning = true; panStart = { x: e.clientX - panX, y: e.clientY - panY };
+      selected = null; renderAll();
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (!panning) return;
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    renderAll();
+  });
+  document.addEventListener('mouseup', () => { panning = false; });
+
+  // ── Toolbar buttons ───────────────────────────────────────────────────────
+  function rotateSel(deg) {
+    if (!selected) return;
+    const pl = placed.find(p => p.id === selected);
+    if (pl) { pl.rotation = ((pl.rotation || 0) + deg) % 360; renderAll(); }
+  }
+  function deleteSel() {
+    if (!selected) return;
+    placed = placed.filter(p => p.id !== selected);
+    selected = null; renderAll();
+  }
+  document.getElementById('btn-rotate-ccw').onclick = () => rotateSel(-15);
+  document.getElementById('btn-rotate-cw').onclick  = () => rotateSel(15);
+  document.getElementById('btn-flip').onclick = () => {
+    if (!selected) return;
+    const pl = placed.find(p => p.id === selected);
+    if (pl) { pl.flipped = !pl.flipped; renderAll(); }
+  };
+  document.getElementById('btn-delete').onclick = deleteSel;
+  document.getElementById('btn-zoom-in').onclick  = () => { zoom = Math.min(4, zoom * 1.2); renderAll(); };
+  document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.2, zoom * 0.8); renderAll(); };
+  document.getElementById('btn-clear').onclick = () => { if (confirm('Clear canvas?')) { placed = []; selected = null; renderAll(); } };
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  document.getElementById('export-btn').onclick = () => {
+    const counts = {};
+    placed.forEach(pl => {
+      const piece = pieces.find(p => p.id === pl.pieceId);
+      const nom = nominalSizes.find(n => n.id === pl.nomId);
+      const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
+      const key = `${nom?.label || '?'} ${piece?.label || piece?.slug || '?'}`;
+      if (!counts[key]) counts[key] = { qty: 0, sku: psRow?.sku, cost: psRow?.unit_cost_usd };
+      counts[key].qty++;
+    });
+    let txt = 'PIPE PUZZLE BUILDER — PARTS LIST\n' + '='.repeat(36) + '\n\n';
+    let total = 0;
+    Object.entries(counts).forEach(([k, v]) => {
+      const line_cost = v.cost ? (v.qty * parseFloat(v.cost)) : null;
+      if (line_cost) total += line_cost;
+      txt += `${v.qty}x  ${k}${v.sku ? '  [' + v.sku + ']' : ''}${line_cost ? '  $' + line_cost.toFixed(2) : ''}\n`;
+    });
+    if (total) txt += '\n' + '-'.repeat(36) + `\nEstimated Total: $${total.toFixed(2)}\n`;
+    txt += '\nPrices are approximate Home Depot retail. Verify availability before purchase.';
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pipe-parts-list.txt';
+    a.click();
+  };
+
+  // ── Save & share ──────────────────────────────────────────────────────────
+  document.getElementById('save-btn').onclick = async () => {
+    try {
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
+      const [assembly] = await sbFetch('pipe_assemblies', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'My Assembly', share_token: token }),
+        prefer: 'return=representation'
+      });
+      const rows = placed.map(pl => ({
+        assembly_id: assembly.id,
+        piece_id: pl.pieceId,
+        nominal_size_id: pl.nomId,
+        x: Math.round(pl.x),
+        y: Math.round(pl.y),
+        rotation: pl.rotation || 0,
+        flipped: pl.flipped || false
+      }));
+      if (rows.length) {
+        await sbFetch('pipe_assembly_pieces', {
+          method: 'POST',
+          body: JSON.stringify(rows),
+          prefer: 'return=minimal'
+        });
+      }
+      const url = `${location.origin}${location.pathname}?s=${token}`;
+      const bar = document.getElementById('share-bar');
+      const link = document.getElementById('share-link');
+      link.href = url; link.textContent = url;
+      bar.style.display = 'flex';
+      setTimeout(() => bar.style.display = 'none', 8000);
+    } catch(err) { alert('Save failed: ' + err.message); }
+  };
+
+  // ── Load shared assembly ──────────────────────────────────────────────────
+  async function loadAssembly(token) {
+    try {
+      const [assembly] = await sbFetch(`pipe_assemblies?share_token=eq.${token}`);
+      if (!assembly) return;
+      const pcs = await sbFetch(`pipe_assembly_pieces?assembly_id=eq.${assembly.id}`);
+      placed = pcs.map(r => ({
+        id: nextId++,
+        pieceId: r.piece_id,
+        nomId: r.nominal_size_id,
+        x: r.x, y: r.y,
+        rotation: r.rotation || 0,
+        flipped: r.flipped || false
+      }));
+    } catch(e) { console.warn('Could not load shared assembly', e); }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  window.addEventListener('resize', renderDotGrid);
+  renderDotGrid();
+  loadCatalog().then(() => renderAll());
+</script>
+</body>
+</html>
