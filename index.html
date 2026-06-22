@@ -36,11 +36,29 @@
     #share-bar { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; }
     #share-bar a { color: #e2c97e; }
     #loading-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #e2c97e; z-index: 999; }
+    /* ── Hover tooltip ── */
+    #piece-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: #16213e;
+      border: 1px solid #e2c97e;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      color: #e2c97e;
+      white-space: nowrap;
+      z-index: 500;
+      display: none;
+      line-height: 1.5;
+    }
+    #piece-tooltip .tt-name { font-weight: 700; color: #fff; }
+    #piece-tooltip .tt-sub  { color: #aaa; }
   </style>
 </head>
 <body>
 
 <div id="loading-overlay">Loading catalog…</div>
+<div id="piece-tooltip"><span class="tt-name"></span><br><span class="tt-sub"></span></div>
 
 <header>
   <h1>🔧 Pipe Puzzle Builder</h1>
@@ -72,7 +90,6 @@
 </div>
 
 <script type="module">
-  // ── Supabase config ──────────────────────────────────────────────────────
   const SUPABASE_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_haKvwV0M7KMj4Qz69M6WGg_KmIfU-aI';
 
@@ -91,7 +108,6 @@
     return res.json();
   }
 
-  // ── State ────────────────────────────────────────────────────────────────
   let nominalSizes = [];
   let pieces = [];
   let pieceSizes = [];
@@ -103,6 +119,32 @@
   let panX = 0, panY = 0;
   let dragging = null;
   const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // ── Tooltip helpers ──────────────────────────────────────────────────────
+  const tooltip = document.getElementById('piece-tooltip');
+  function showTooltip(e, pl) {
+    const piece = pieces.find(p => p.id === pl.pieceId);
+    const nom   = nominalSizes.find(n => n.id === pl.nomId);
+    const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
+    const name  = piece?.name || piece?.slug || 'Unknown';
+    const size  = nom?.label || '';
+    let sub = size;
+    if (psRow?.sku)           sub += (sub ? '  ·  ' : '') + 'SKU: ' + psRow.sku;
+    if (psRow?.unit_cost_usd) sub += (sub ? '  ·  ' : '') + '$' + Number(psRow.unit_cost_usd).toFixed(2);
+    tooltip.querySelector('.tt-name').textContent = name;
+    tooltip.querySelector('.tt-sub').textContent  = sub;
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  }
+  function positionTooltip(e) {
+    const pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + tooltip.offsetWidth  > window.innerWidth)  x = e.clientX - tooltip.offsetWidth  - pad;
+    if (y + tooltip.offsetHeight > window.innerHeight) y = e.clientY - tooltip.offsetHeight - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+  function hideTooltip() { tooltip.style.display = 'none'; }
 
   // ── Load catalog ─────────────────────────────────────────────────────────
   async function loadCatalog() {
@@ -268,7 +310,12 @@
       if (selected === pl.id) border.setAttribute('stroke', '#e2c97e');
       grp.appendChild(border);
       Array.from(inner.childNodes).forEach(n => grp.appendChild(n.cloneNode(true)));
+      // ── tooltip events
+      grp.addEventListener('mouseenter', e => showTooltip(e, pl));
+      grp.addEventListener('mousemove',  e => positionTooltip(e));
+      grp.addEventListener('mouseleave', () => hideTooltip());
       grp.addEventListener('mousedown', e => {
+        hideTooltip();
         e.stopPropagation();
         selected = pl.id;
         dragging = { type: 'placed', id: pl.id, startX: e.clientX, startY: e.clientY, origX: pl.x, origY: pl.y };
@@ -450,7 +497,6 @@
     } catch(e) { console.warn('Could not load shared assembly', e); }
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────
   window.addEventListener('resize', renderDotGrid);
   renderDotGrid();
   loadCatalog().then(() => renderAll());
