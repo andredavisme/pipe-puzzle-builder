@@ -94,14 +94,14 @@
   // ── State ────────────────────────────────────────────────────────────────
   let nominalSizes = [];
   let pieces = [];
-  let pieceSizes = [];  // all rows from pipe_piece_sizes
-  let activeNomId = 1; // default ½"
-  let placed = [];      // {id, pieceId, nomId, x, y, rotation, flipped}
+  let pieceSizes = [];
+  let activeNomId = 1;
+  let placed = [];
   let selected = null;
   let nextId = 1;
   let zoom = 1;
   let panX = 0, panY = 0;
-  let dragging = null; // {type:'sidebar'|'placed', ...}
+  let dragging = null;
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   // ── Load catalog ─────────────────────────────────────────────────────────
@@ -109,13 +109,12 @@
     const [sizes, cats, pcs, pSizes] = await Promise.all([
       sbFetch('pipe_nominal_sizes?order=id'),
       sbFetch('pipe_categories?order=id'),
-      sbFetch('pipe_pieces?order=id&select=id,slug,piece_type,label,length_in,category_id'),
+      sbFetch('pipe_pieces?order=id&select=id,slug,piece_type,name,length_in,category_id'),
       sbFetch('pipe_piece_sizes?order=piece_id,nominal_size_id&select=id,piece_id,nominal_size_id,sku,unit_cost_usd,is_active')
     ]);
     nominalSizes = sizes;
     pieces = pcs;
     pieceSizes = pSizes;
-    // Build size tabs
     const tabWrap = document.getElementById('size-tabs');
     sizes.forEach(s => {
       const b = document.createElement('button');
@@ -125,11 +124,8 @@
       b.addEventListener('click', () => setNominalSize(s.id));
       tabWrap.appendChild(b);
     });
-    // Map cats
     const catMap = {}; cats.forEach(c => catMap[c.id] = c);
-    // Build sidebar
     buildSidebar(cats, catMap);
-    // Check for shared assembly
     const params = new URLSearchParams(location.search);
     if (params.get('s')) await loadAssembly(params.get('s'));
     document.getElementById('loading-overlay').style.display = 'none';
@@ -220,7 +216,7 @@
         btn.className = 'piece-btn';
         btn.draggable = true;
         btn.dataset.pieceId = p.id;
-        btn.innerHTML = `${makeSVG(p, activeNomId)}<span>${p.label || p.slug}${psRow.unit_cost_usd ? ' — $' + Number(psRow.unit_cost_usd).toFixed(2) : ''}</span>`;
+        btn.innerHTML = `${makeSVG(p, activeNomId)}<span>${p.name || p.slug}${psRow.unit_cost_usd ? ' — $' + Number(psRow.unit_cost_usd).toFixed(2) : ''}</span>`;
         btn.addEventListener('dragstart', e => {
           dragging = { type: 'sidebar', pieceId: p.id };
           e.dataTransfer.effectAllowed = 'copy';
@@ -292,7 +288,7 @@
     placed.forEach(pl => {
       const piece = pieces.find(p => p.id === pl.pieceId);
       const nom = nominalSizes.find(n => n.id === pl.nomId);
-      const key = `${nom?.label || ''} ${piece?.label || piece?.slug || ''}`;
+      const key = `${nom?.label || ''} ${piece?.name || piece?.slug || ''}`;
       counts[key] = (counts[key] || 0) + 1;
     });
     Object.entries(counts).forEach(([k, v]) => {
@@ -383,7 +379,7 @@
       const piece = pieces.find(p => p.id === pl.pieceId);
       const nom = nominalSizes.find(n => n.id === pl.nomId);
       const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
-      const key = `${nom?.label || '?'} ${piece?.label || piece?.slug || '?'}`;
+      const key = `${nom?.label || '?'} ${piece?.name || piece?.slug || '?'}`;
       if (!counts[key]) counts[key] = { qty: 0, sku: psRow?.sku, cost: psRow?.unit_cost_usd };
       counts[key].qty++;
     });
