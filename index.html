@@ -31,33 +31,84 @@
     #bom-bar { background: #16213e; border-top: 2px solid #0f3460; padding: 6px 14px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; min-height: 36px; }
     #bom-bar span { font-size: 0.75rem; color: #aaa; }
     #bom-bar .bom-item { background: #0f3460; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; color: #e2c97e; }
-    #export-btn, #save-btn { margin-left: auto; padding: 4px 12px; background: #e2c97e; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    #export-btn, #save-btn, #load-btn { margin-left: auto; padding: 4px 12px; background: #e2c97e; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
     #save-btn { background: #4CAF50; color: #fff; margin-left: 6px; }
+    #load-btn { background: #0f3460; color: #e2c97e; border: 1px solid #e2c97e; margin-left: 6px; }
+    #load-btn:hover { background: #1a4a7a; }
     #share-bar { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; }
     #share-bar a { color: #e2c97e; }
     #loading-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #e2c97e; z-index: 999; }
     #piece-tooltip {
-      position: fixed;
-      pointer-events: none;
-      background: #16213e;
-      border: 1px solid #e2c97e;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 0.75rem;
-      color: #e2c97e;
-      white-space: nowrap;
-      z-index: 500;
-      display: none;
-      line-height: 1.5;
+      position: fixed; pointer-events: none; background: #16213e; border: 1px solid #e2c97e;
+      border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; color: #e2c97e;
+      white-space: nowrap; z-index: 500; display: none; line-height: 1.5;
     }
     #piece-tooltip .tt-name { font-weight: 700; color: #fff; }
     #piece-tooltip .tt-sub  { color: #aaa; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center; z-index: 800;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: #16213e; border: 1px solid #0f3460; border-radius: 10px;
+      padding: 20px; width: 420px; max-width: 95vw; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .modal h2 { font-size: 1rem; color: #e2c97e; }
+    .modal input[type=text] {
+      width: 100%; padding: 7px 10px; background: #0f1a2e; border: 1px solid #0f3460;
+      border-radius: 4px; color: #e0e0e0; font-size: 0.85rem;
+    }
+    .modal input[type=text]:focus { outline: none; border-color: #e2c97e; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-actions button {
+      padding: 5px 14px; border-radius: 4px; border: none; cursor: pointer;
+      font-size: 0.8rem; font-weight: 700;
+    }
+    .btn-primary { background: #4CAF50; color: #fff; }
+    .btn-cancel  { background: #0f3460; color: #aaa; border: 1px solid #0f3460 !important; }
+    #designs-list { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .design-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; background: #0f1a2e; border: 1px solid #0f3460;
+      border-radius: 6px; cursor: pointer; transition: border-color .15s;
+    }
+    .design-row:hover { border-color: #e2c97e; }
+    .design-row .dr-title { font-size: 0.85rem; color: #e0e0e0; }
+    .design-row .dr-date  { font-size: 0.7rem; color: #666; }
+    .designs-empty { color: #555; font-size: 0.85rem; text-align: center; padding: 20px 0; }
   </style>
 </head>
 <body>
 
 <div id="loading-overlay">Loading catalog…</div>
 <div id="piece-tooltip"><span class="tt-name"></span><br><span class="tt-sub"></span></div>
+
+<!-- Save modal -->
+<div id="save-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>💾 Save Design</h2>
+    <input type="text" id="save-title" placeholder="Design name (e.g. Garage Manifold)" maxlength="80" />
+    <div class="modal-actions">
+      <button class="btn-cancel" id="save-modal-cancel">Cancel</button>
+      <button class="btn-primary" id="save-modal-confirm">Save &amp; Get Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load modal -->
+<div id="load-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>📂 Saved Designs</h2>
+    <div id="designs-list"><div class="designs-empty">Loading…</div></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="load-modal-cancel">Close</button>
+    </div>
+  </div>
+</div>
 
 <header>
   <h1>🔧 Pipe Puzzle Builder</h1>
@@ -86,6 +137,7 @@
   <span>Parts List:</span>
   <button id="export-btn">Export List</button>
   <button id="save-btn">💾 Save &amp; Share</button>
+  <button id="load-btn">📂 Load</button>
 </div>
 
 <script type="module">
@@ -364,6 +416,7 @@
   });
   document.addEventListener('mouseup', () => { if (dragging?.type === 'placed') dragging = null; });
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModals(); }
     if (e.key === 'r' || e.key === 'R') rotateSel(15);
     if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
   });
@@ -410,6 +463,12 @@
   document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.2, zoom * 0.8); renderAll(); };
   document.getElementById('btn-clear').onclick = () => { if (confirm('Clear canvas?')) { placed = []; selected = null; renderAll(); } };
 
+  function closeModals() {
+    document.getElementById('save-modal').classList.add('hidden');
+    document.getElementById('load-modal').classList.add('hidden');
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────
   document.getElementById('export-btn').onclick = () => {
     const counts = {};
     placed.forEach(pl => {
@@ -430,27 +489,35 @@
     if (total) txt += '\n' + '-'.repeat(36) + `\nEstimated Total: $${total.toFixed(2)}\n`;
     txt += '\nPrices are approximate Home Depot retail. Verify availability before purchase.';
     const blob = new Blob([txt], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'pipe-parts-list.txt';
-    a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'pipe-parts-list.txt'; a.click();
   };
 
-  // ── Save & share ──────────────────────────────────────────────────────────
-  document.getElementById('save-btn').onclick = async () => {
+  // ── Save modal ────────────────────────────────────────────────────────────
+  document.getElementById('save-btn').onclick = () => {
+    document.getElementById('save-title').value = '';
+    document.getElementById('save-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('save-title').focus(), 50);
+  };
+  document.getElementById('save-modal-cancel').onclick = closeModals;
+  document.getElementById('save-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('save-modal')) closeModals();
+  });
+
+  document.getElementById('save-modal-confirm').onclick = async () => {
+    const titleVal = document.getElementById('save-title').value.trim() || 'Untitled Assembly';
+    document.getElementById('save-modal-confirm').textContent = 'Saving…';
+    document.getElementById('save-modal-confirm').disabled = true;
     try {
       const token = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
-
-      // Insert assembly using minimal, then fetch it back by token
       await sbFetch('pipe_assemblies', {
         method: 'POST',
-        body: JSON.stringify({ share_token: token }),
+        body: JSON.stringify({ share_token: token, title: titleVal }),
         prefer: 'return=minimal'
       });
       const assemblies = await sbFetch(`pipe_assemblies?share_token=eq.${token}&select=id`);
       const assembly = assemblies?.[0];
       if (!assembly) throw new Error('Assembly not found after insert');
-
       const rows = placed.map(pl => {
         const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
         return {
@@ -471,14 +538,57 @@
           prefer: 'return=minimal'
         });
       }
+      closeModals();
       const url = `${location.origin}${location.pathname}?s=${token}`;
       const bar = document.getElementById('share-bar');
       const link = document.getElementById('share-link');
       link.href = url; link.textContent = url;
       bar.style.display = 'flex';
       setTimeout(() => bar.style.display = 'none', 8000);
-    } catch(err) { alert('Save failed: ' + err.message); }
+    } catch(err) {
+      alert('Save failed: ' + err.message);
+    } finally {
+      document.getElementById('save-modal-confirm').textContent = 'Save & Get Link';
+      document.getElementById('save-modal-confirm').disabled = false;
+    }
   };
+
+  // ── Load modal ────────────────────────────────────────────────────────────
+  document.getElementById('load-btn').onclick = async () => {
+    document.getElementById('load-modal').classList.remove('hidden');
+    const list = document.getElementById('designs-list');
+    list.innerHTML = '<div class="designs-empty">Loading…</div>';
+    try {
+      const rows = await sbFetch('pipe_assemblies?order=created_at.desc&limit=50&select=id,title,share_token,created_at');
+      list.innerHTML = '';
+      if (!rows || rows.length === 0) {
+        list.innerHTML = '<div class="designs-empty">No saved designs yet.</div>';
+        return;
+      }
+      rows.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'design-row';
+        const d = new Date(r.created_at);
+        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+          + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        row.innerHTML = `<span class="dr-title">${r.title || 'Untitled Assembly'}</span><span class="dr-date">${dateStr}</span>`;
+        row.addEventListener('click', async () => {
+          closeModals();
+          placed = []; selected = null;
+          await loadAssembly(r.share_token);
+          renderAll();
+          history.replaceState(null, '', `${location.pathname}?s=${r.share_token}`);
+        });
+        list.appendChild(row);
+      });
+    } catch(e) {
+      list.innerHTML = '<div class="designs-empty">Error loading designs.</div>';
+    }
+  };
+  document.getElementById('load-modal-cancel').onclick = closeModals;
+  document.getElementById('load-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('load-modal')) closeModals();
+  });
 
   // ── Load shared assembly ──────────────────────────────────────────────────
   async function loadAssembly(token) {
