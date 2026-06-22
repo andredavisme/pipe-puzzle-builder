@@ -16,6 +16,12 @@ An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe 
 - **Load designs** — browse and restore any previously saved assembly
 - **Supabase catalog backend** — pieces, sizes, SKUs, and pricing from real Southland/STZ data
 
+## Example Designs
+
+| Design | Description | Link |
+|---|---|---|
+| **Indian Club** | A [club-shaped exercise tool](https://en.wikipedia.org/wiki/Indian_club) swung for shoulder mobility and strength — classic gym equipment made from pipe fittings | [Open design →](https://andredavisme.github.io/pipe-puzzle-builder/?s=0c3d4fb0762631ba) |
+
 ## Piece Catalog
 
 | Category | Pieces |
