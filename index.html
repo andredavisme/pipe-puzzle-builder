@@ -105,7 +105,9 @@
     });
     if (!res.ok) throw new Error(await res.text());
     if (res.status === 204 || res.status === 205) return null;
-    return res.json();
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text);
   }
 
   let nominalSizes = [];
@@ -438,11 +440,17 @@
   document.getElementById('save-btn').onclick = async () => {
     try {
       const token = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
-      const [assembly] = await sbFetch('pipe_assemblies', {
+
+      // Insert assembly using minimal, then fetch it back by token
+      await sbFetch('pipe_assemblies', {
         method: 'POST',
         body: JSON.stringify({ share_token: token }),
-        prefer: 'return=representation'
+        prefer: 'return=minimal'
       });
+      const assemblies = await sbFetch(`pipe_assemblies?share_token=eq.${token}&select=id`);
+      const assembly = assemblies?.[0];
+      if (!assembly) throw new Error('Assembly not found after insert');
+
       const rows = placed.map(pl => {
         const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
         return {
