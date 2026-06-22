@@ -24,6 +24,8 @@ An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe 
 
 > ✨ **Try it:** The end cap on the 18" pipe is intentionally missing. Drag a **Cap** from the sidebar onto the open end to complete the club, then hit **Export List** to see the full parts list with SKUs and pricing.
 
+![Indian Club — parts list and canvas view](docs/indian-club.png)
+
 ## Piece Catalog
 
 | Category | Pieces |
