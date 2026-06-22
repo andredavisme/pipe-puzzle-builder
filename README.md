@@ -1,5 +1,7 @@
 # Pipe Puzzle Builder
 
+**🔗 Live site: [andredavisme.github.io/pipe-puzzle-builder](https://andredavisme.github.io/pipe-puzzle-builder)**
+
 An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe projects — like building in-store, but online.
 
 ## Features
@@ -11,6 +13,7 @@ An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe 
 - **Live BOM** — running parts count at the bottom
 - **Export list** — downloads a plain-text parts list for Home Depot / Lowes
 - **Save & share** — writes to Supabase; returns a shareable `?s=<token>` URL
+- **Load designs** — browse and restore any previously saved assembly
 - **Supabase catalog backend** — pieces, sizes, SKUs, and pricing from real Southland/STZ data
 
 ## Piece Catalog
