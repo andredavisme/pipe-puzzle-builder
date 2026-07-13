@@ -1,616 +1,606 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pipe Puzzle Builder</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-    header { background: #16213e; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #0f3460; }
-    header h1 { font-size: 1.1rem; color: #e2c97e; letter-spacing: 1px; }
-    #size-tabs { display: flex; gap: 6px; margin-left: auto; }
-    .size-tab { padding: 4px 10px; border: 1px solid #0f3460; border-radius: 4px; background: #0f3460; color: #aaa; cursor: pointer; font-size: 0.8rem; transition: all .15s; }
-    .size-tab.active { background: #e2c97e; color: #1a1a2e; border-color: #e2c97e; font-weight: 700; }
-    #main { display: flex; flex: 1; overflow: hidden; }
-    #sidebar { width: 200px; background: #16213e; border-right: 2px solid #0f3460; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-    .cat-label { font-size: 0.7rem; color: #e2c97e; text-transform: uppercase; letter-spacing: 1px; padding: 4px 2px 2px; border-top: 1px solid #0f3460; margin-top: 4px; }
-    .cat-label:first-child { border-top: none; margin-top: 0; }
-    .piece-btn { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #0f3460; border: 1px solid #1a4a7a; border-radius: 6px; cursor: grab; transition: background .15s; user-select: none; }
-    .piece-btn:hover { background: #1a5a9a; }
-    .piece-btn svg { flex-shrink: 0; }
-    .piece-btn span { font-size: 0.75rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0f0f1e; }
-    #canvas-wrap svg#dotgrid { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-    #canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-    .placed-piece { cursor: pointer; }
-    .placed-piece.selected > rect.sel-border { stroke: #e2c97e; stroke-width: 2; fill: none; }
-    #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
-    .tb-btn { padding: 5px 10px; background: #16213e; border: 1px solid #0f3460; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.8rem; }
-    .tb-btn:hover { background: #0f3460; }
-    #bom-bar { background: #16213e; border-top: 2px solid #0f3460; padding: 6px 14px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; min-height: 36px; }
-    #bom-bar span { font-size: 0.75rem; color: #aaa; }
-    #bom-bar .bom-item { background: #0f3460; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; color: #e2c97e; }
-    #export-btn, #save-btn, #load-btn { margin-left: auto; padding: 4px 12px; background: #e2c97e; color: #1a1a2e; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
-    #save-btn { background: #4CAF50; color: #fff; margin-left: 6px; }
-    #load-btn { background: #0f3460; color: #e2c97e; border: 1px solid #e2c97e; margin-left: 6px; }
-    #load-btn:hover { background: #1a4a7a; }
-    #share-bar { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; }
-    #share-bar a { color: #e2c97e; }
-    #loading-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #e2c97e; z-index: 999; }
-    #piece-tooltip {
-      position: fixed; pointer-events: none; background: #16213e; border: 1px solid #e2c97e;
-      border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; color: #e2c97e;
-      white-space: nowrap; z-index: 500; display: none; line-height: 1.5;
-    }
-    #piece-tooltip .tt-name { font-weight: 700; color: #fff; }
-    #piece-tooltip .tt-sub  { color: #aaa; }
-
-    /* ── Modal ── */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-      display: flex; align-items: center; justify-content: center; z-index: 800;
-    }
-    .modal-backdrop.hidden { display: none; }
-    .modal {
-      background: #16213e; border: 1px solid #0f3460; border-radius: 10px;
-      padding: 20px; width: 420px; max-width: 95vw; max-height: 80vh;
-      display: flex; flex-direction: column; gap: 12px;
-    }
-    .modal h2 { font-size: 1rem; color: #e2c97e; }
-    .modal input[type=text] {
-      width: 100%; padding: 7px 10px; background: #0f1a2e; border: 1px solid #0f3460;
-      border-radius: 4px; color: #e0e0e0; font-size: 0.85rem;
-    }
-    .modal input[type=text]:focus { outline: none; border-color: #e2c97e; }
-    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .modal-actions button {
-      padding: 5px 14px; border-radius: 4px; border: none; cursor: pointer;
-      font-size: 0.8rem; font-weight: 700;
-    }
-    .btn-primary { background: #4CAF50; color: #fff; }
-    .btn-cancel  { background: #0f3460; color: #aaa; border: 1px solid #0f3460 !important; }
-    #designs-list { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .design-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 10px; background: #0f1a2e; border: 1px solid #0f3460;
-      border-radius: 6px; cursor: pointer; transition: border-color .15s;
-    }
-    .design-row:hover { border-color: #e2c97e; }
-    .design-row .dr-title { font-size: 0.85rem; color: #e0e0e0; }
-    .design-row .dr-date  { font-size: 0.7rem; color: #666; }
-    .designs-empty { color: #555; font-size: 0.85rem; text-align: center; padding: 20px 0; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Block Thread Notes</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1c2436; --line:#2a3450;
+    --accent:#4f8cff; --accent2:#ff6b6b; --text:#e8ecf5; --muted:#8a94ab;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden;}
+  #toolbar{
+    position:fixed;top:0;left:0;right:0;height:52px;background:var(--panel);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;
+    padding:0 12px;z-index:20;
+  }
+  #toolbar .grp{display:flex;gap:6px;align-items:center;border-right:1px solid var(--line);padding-right:10px;margin-right:4px;}
+  #toolbar .grp:last-child{border-right:none;}
+  button, input[type=text], select{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;
+  }
+  button:hover{border-color:var(--accent);}
+  button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  #boardName{width:160px;cursor:text;}
+  #canvasWrap{position:absolute;top:52px;left:0;right:0;bottom:0;overflow:hidden;cursor:grab;}
+  #canvasWrap.connecting{cursor:crosshair;}
+  svg#canvas{width:100%;height:100%;display:block;background-size:24px 24px;
+    background-image:radial-gradient(circle,#232c42 1px,transparent 1px);}
+  .block-card{cursor:move;}
+  .block-rect{fill:#1c2436;stroke:#3a4568;stroke-width:1.5;rx:8;}
+  .block-rect.selected{stroke:var(--accent);stroke-width:2.5;}
+  .block-tag{font-size:10px;fill:var(--muted);font-weight:600;}
+  .block-title{font-size:13px;fill:var(--text);font-weight:600;}
+  .block-desc{font-size:11px;fill:var(--muted);}
+  .thread-path{fill:none;stroke:#5a6a92;stroke-width:2;cursor:pointer;}
+  .thread-path.selected{stroke:var(--accent);stroke-width:3;}
+  .thread-label{font-size:10px;fill:var(--muted);pointer-events:none;}
+  .port{fill:#5a6a92;stroke:#0f1420;stroke-width:1;cursor:crosshair;}
+  .port:hover{fill:var(--accent);}
+  #modalOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;
+    align-items:center;justify-content:center;z-index:100;
+  }
+  #modalOverlay.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:20px;width:360px;max-width:90vw;}
+  .modal h3{margin:0 0 14px;font-size:15px;}
+  .modal label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;}
+  .modal input[type=text], .modal textarea, .modal input[type=color]{
+    width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:6px;padding:8px;font-size:13px;font-family:inherit;
+  }
+  .modal textarea{resize:vertical;min-height:60px;}
+  .modal .actions{display:flex;justify-content:space-between;margin-top:16px;gap:8px;}
+  .modal .actions .left{display:flex;gap:8px;}
+  #boardsList{max-height:260px;overflow-y:auto;margin-top:10px;}
+  .boardRow{display:flex;justify-content:space-between;align-items:center;
+    padding:8px;border-bottom:1px solid var(--line);font-size:13px;}
+  .boardRow button{padding:3px 8px;font-size:11px;}
+  #toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--accent);color:var(--text);
+    padding:10px 16px;border-radius:8px;font-size:13px;z-index:200;display:none;
+  }
+  a{color:var(--accent);}
+  #fileImportInput{display:none;}
+</style>
 </head>
 <body>
 
-<div id="loading-overlay">Loading catalog…</div>
-<div id="piece-tooltip"><span class="tt-name"></span><br><span class="tt-sub"></span></div>
-
-<!-- Save modal -->
-<div id="save-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>💾 Save Design</h2>
-    <input type="text" id="save-title" placeholder="Design name (e.g. Garage Manifold)" maxlength="80" />
-    <div class="modal-actions">
-      <button class="btn-cancel" id="save-modal-cancel">Cancel</button>
-      <button class="btn-primary" id="save-modal-confirm">Save &amp; Get Link</button>
-    </div>
+<div id="toolbar">
+  <div class="grp">
+    <input type="text" id="boardName" value="Untitled Board" title="Board name">
+  </div>
+  <div class="grp">
+    <button id="btnSelect" class="active" title="Select tool (V)">V Select</button>
+    <button id="btnConnect" title="Connect tool (C)">C Connect</button>
+    <button id="btnAddBlock" title="Add block (N)">+ Block</button>
+  </div>
+  <div class="grp">
+    <button id="btnSave" title="Save to localStorage">💾 Save</button>
+    <button id="btnBoards" title="Browse saved boards">📂 Boards</button>
+    <button id="btnCopyLink" title="Copy shareable link">🔗 Copy Link</button>
+  </div>
+  <div class="grp">
+    <button id="btnExportJson" title="Export board as JSON">📥 Export JSON</button>
+    <button id="btnImportJson" title="Import board from JSON">📤 Import JSON</button>
+    <button id="btnExportCsv" title="Export blocks/threads as CSV">📊 Export CSV</button>
+  </div>
+  <div class="grp">
+    <button id="btnFit" title="Fit to screen">⊡ Fit</button>
   </div>
 </div>
 
-<!-- Load modal -->
-<div id="load-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>📂 Saved Designs</h2>
-    <div id="designs-list"><div class="designs-empty">Loading…</div></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" id="load-modal-cancel">Close</button>
-    </div>
-  </div>
+<div id="canvasWrap">
+  <svg id="canvas">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5a6a92"></path>
+      </marker>
+    </defs>
+    <g id="viewport">
+      <g id="threadsLayer"></g>
+      <g id="blocksLayer"></g>
+    </g>
+  </svg>
 </div>
 
-<header>
-  <h1>🔧 Pipe Puzzle Builder</h1>
-  <div id="size-tabs"></div>
-</header>
+<input type="file" id="fileImportInput" accept="application/json">
 
-<div id="main">
-  <div id="sidebar"></div>
-  <div id="canvas-wrap">
-    <svg id="dotgrid"></svg>
-    <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
-    <div id="toolbar">
-      <button class="tb-btn" id="btn-rotate-ccw" title="Rotate CCW">↺</button>
-      <button class="tb-btn" id="btn-rotate-cw" title="Rotate CW">↻</button>
-      <button class="tb-btn" id="btn-flip" title="Flip 180°">⇅</button>
-      <button class="tb-btn" id="btn-delete" title="Delete">🗑</button>
-      <button class="tb-btn" id="btn-zoom-in">＋</button>
-      <button class="tb-btn" id="btn-zoom-out">－</button>
-      <button class="tb-btn" id="btn-clear" title="Clear canvas">Clear</button>
-    </div>
-    <div id="share-bar">Saved! Share: <a id="share-link" href="#" target="_blank"></a></div>
-  </div>
+<div id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
 </div>
 
-<div id="bom-bar">
-  <span>Parts List:</span>
-  <button id="export-btn">Export List</button>
-  <button id="save-btn">💾 Save &amp; Share</button>
-  <button id="load-btn">📂 Load</button>
-</div>
+<div id="toast"></div>
 
-<script type="module">
-  const SUPABASE_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_haKvwV0M7KMj4Qz69M6WGg_KmIfU-aI';
+<script>
+(function(){
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById('canvas');
+  const viewport = document.getElementById('viewport');
+  const blocksLayer = document.getElementById('blocksLayer');
+  const threadsLayer = document.getElementById('threadsLayer');
+  const canvasWrap = document.getElementById('canvasWrap');
+  const boardNameInput = document.getElementById('boardName');
 
-  async function sbFetch(path, opts = {}) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-      ...opts,
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: opts.prefer || 'return=representation',
-        ...opts.headers
-      }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    if (res.status === 204 || res.status === 205) return null;
-    const text = await res.text();
-    if (!text) return null;
-    return JSON.parse(text);
-  }
-
-  let nominalSizes = [];
-  let pieces = [];
-  let pieceSizes = [];
-  let activeNomId = 1;
-  let placed = [];
-  let selected = null;
-  let nextId = 1;
-  let zoom = 1;
-  let panX = 0, panY = 0;
+  let state = { blocks: [], threads: [] };
+  let view = { x:0, y:0, scale:1 };
+  let tool = 'select';
+  let selected = { type:null, id:null };
   let dragging = null;
-  const SVG_NS = 'http://www.w3.org/2000/svg';
+  let connectFrom = null;
+  let panStart = null;
 
-  const tooltip = document.getElementById('piece-tooltip');
-  function showTooltip(e, pl) {
-    const piece = pieces.find(p => p.id === pl.pieceId);
-    const nom   = nominalSizes.find(n => n.id === pl.nomId);
-    const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
-    const name  = piece?.name || piece?.slug || 'Unknown';
-    const size  = nom?.label || '';
-    let sub = size;
-    if (psRow?.sku)           sub += (sub ? '  ·  ' : '') + 'SKU: ' + psRow.sku;
-    if (psRow?.unit_cost_usd) sub += (sub ? '  ·  ' : '') + '$' + Number(psRow.unit_cost_usd).toFixed(2);
-    tooltip.querySelector('.tt-name').textContent = name;
-    tooltip.querySelector('.tt-sub').textContent  = sub;
-    tooltip.style.display = 'block';
-    positionTooltip(e);
-  }
-  function positionTooltip(e) {
-    const pad = 14;
-    let x = e.clientX + pad, y = e.clientY + pad;
-    if (x + tooltip.offsetWidth  > window.innerWidth)  x = e.clientX - tooltip.offsetWidth  - pad;
-    if (y + tooltip.offsetHeight > window.innerHeight) y = e.clientY - tooltip.offsetHeight - pad;
-    tooltip.style.left = x + 'px';
-    tooltip.style.top  = y + 'px';
-  }
-  function hideTooltip() { tooltip.style.display = 'none'; }
-
-  async function loadCatalog() {
-    const [sizes, cats, pcs, pSizes] = await Promise.all([
-      sbFetch('pipe_nominal_sizes?order=id'),
-      sbFetch('pipe_categories?order=id'),
-      sbFetch('pipe_pieces?order=id&select=id,slug,piece_type,name,length_in,category_id'),
-      sbFetch('pipe_piece_sizes?order=piece_id,nominal_size_id&select=id,piece_id,nominal_size_id,sku,unit_cost_usd,is_active')
-    ]);
-    nominalSizes = sizes;
-    pieces = pcs;
-    pieceSizes = pSizes;
-    const tabWrap = document.getElementById('size-tabs');
-    sizes.forEach(s => {
-      const b = document.createElement('button');
-      b.className = 'size-tab' + (s.id === activeNomId ? ' active' : '');
-      b.textContent = s.label;
-      b.dataset.id = s.id;
-      b.addEventListener('click', () => setNominalSize(s.id));
-      tabWrap.appendChild(b);
-    });
-    const catMap = {}; cats.forEach(c => catMap[c.id] = c);
-    buildSidebar(cats, catMap);
-    const params = new URLSearchParams(location.search);
-    if (params.get('s')) await loadAssembly(params.get('s'));
-    document.getElementById('loading-overlay').style.display = 'none';
+  function uid(prefix){ return prefix + Math.random().toString(36).slice(2,9); }
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display='block';
+    clearTimeout(t._h);
+    t._h = setTimeout(()=> t.style.display='none', 2200);
   }
 
-  function setNominalSize(id) {
-    activeNomId = id;
-    document.querySelectorAll('.size-tab').forEach(b => b.classList.toggle('active', +b.dataset.id === id));
-    buildSidebar();
-    renderAll();
+  function screenToWorld(sx, sy){
+    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
   }
 
-  function getPieceSizeRow(pieceId, nomId) {
-    return pieceSizes.find(r => r.piece_id === pieceId && r.nominal_size_id === nomId && r.is_active !== false);
+  function applyView(){
+    viewport.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.scale})`);
+    svg.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    svg.style.backgroundSize = `${24*view.scale}px ${24*view.scale}px`;
   }
 
-  const SCALE = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.25, 5: 1.5, 6: 2.0 };
-
-  function metalGradDef(id) {
-    return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8cfd4"/><stop offset="40%" stop-color="#9aa5ad"/><stop offset="100%" stop-color="#6b7880"/></linearGradient></defs>`;
+  function newBlock(x,y){
+    return { id: uid('b'), tag: 'TAG-' + Math.floor(Math.random()*900+100),
+      label: 'New Block', desc: '', x, y, w:160, h:70, color:'#0f3460' };
   }
 
-  function pipeSVG(nomId, lengthIn) {
-    const s = SCALE[nomId] || 1;
-    const od = Math.round(14 * s);
-    const len = Math.round(lengthIn * 4 * s);
-    const w = len + 20, h = od + 16;
-    const gid = `mg${nomId}p${lengthIn}`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      ${metalGradDef(gid)}
-      <rect x="8" y="4" width="${len+4}" height="${od+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>
-      <rect x="2" y="6" width="10" height="${od+4}" rx="2" fill="#7a8890" stroke="#444" stroke-width=".5"/>
-      <rect x="${w-12}" y="6" width="10" height="${od+4}" rx="2" fill="#7a8890" stroke="#444" stroke-width=".5"/>
-      <rect x="10" y="6" width="${len}" height="4" rx="1" fill="rgba(255,255,255,0.18)"/>
-    </svg>`;
-  }
-
-  function fittingSVG(nomId, type) {
-    const s = SCALE[nomId] || 1;
-    const b = Math.round(20 * s);
-    const gid = `mgf${nomId}${type}`;
-    const shapes = {
-      coupling:     `<rect x="4" y="${8-b/4}" width="${b+8}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-      cap:          `<rect x="4" y="${8-b/4}" width="${b*0.6}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${4+b*0.6-2}" y="${8-b/4}" width="6" height="${b/2+8}" fill="#7a8890" stroke="#444" stroke-width=".5"/>`,
-      elbow90:      `<path d="M4,${b+4} L4,8 Q4,4 8,4 L${b+4},4" stroke="url(#${gid})" stroke-width="${b/2}" fill="none" stroke-linecap="round"/>`,
-      elbow45:      `<path d="M4,${b+4} L4,${b/2+4} Q4,4 ${b/2+4},4 L${b+4},4" stroke="url(#${gid})" stroke-width="${b/2}" fill="none" stroke-linecap="round"/>`,
-      tee:          `<rect x="4" y="${b/2}" width="${b*2}" height="${b/2+4}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${b+2}" y="4" width="${b/2+4}" height="${b/2}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-      cross:        `<rect x="4" y="${b/2}" width="${b*2+8}" height="${b/2+4}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><rect x="${b+2}" y="4" width="${b/2+4}" height="${b*2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-      union:        `<rect x="4" y="${8-b/4}" width="${b+8}" height="${b/2+8}" rx="3" fill="url(#${gid})" stroke="#555" stroke-width="1"/><line x1="${(b+16)/2}" y1="${8-b/4}" x2="${(b+16)/2}" y2="${8+b/4+8}" stroke="#444" stroke-width="2"/>`,
-      nipple:       `<rect x="2" y="${8-b/6}" width="${b+12}" height="${b/3+6}" rx="2" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-      flange:       `<rect x="2" y="2" width="${b+12}" height="${b+12}" rx="4" fill="url(#${gid})" stroke="#555" stroke-width="1"/><circle cx="${(b+16)/2}" cy="${(b+16)/2}" r="${b/4}" fill="none" stroke="#444" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="#555"/><circle cx="${b+10}" cy="6" r="2" fill="#555"/><circle cx="6" cy="${b+10}" r="2" fill="#555"/><circle cx="${b+10}" cy="${b+10}" r="2" fill="#555"/>`,
-      reducer:      `<polygon points="4,${8-b/4} ${b*1.5},${8-b/6} ${b*1.5},${8+b/6+8} 4,${8+b/4+8}" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-      'reducer-coupling': `<polygon points="4,${8-b/4} ${b*1.5},${8-b/6} ${b*1.5},${8+b/6+8} 4,${8+b/4+8}" fill="url(#${gid})" stroke="#555" stroke-width="1"/>`,
-    };
-    const shape = shapes[type] || shapes.coupling;
-    const vw = b * 2.5 + 16, vh = b * 2.5 + 16;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${vw}" height="${vh}" viewBox="0 0 ${vw} ${vh}">
-      ${metalGradDef(gid)}
-      ${shape}
-    </svg>`;
-  }
-
-  function makeSVG(piece, nomId) {
-    if (piece.piece_type === 'pipe') return pipeSVG(nomId, piece.length_in || 6);
-    return fittingSVG(nomId, piece.piece_type);
-  }
-
-  function buildSidebar(cats, catMap) {
-    const sb = document.getElementById('sidebar');
-    sb.innerHTML = '';
-    const groups = {};
-    pieces.forEach(p => {
-      const cid = p.category_id;
-      if (!groups[cid]) groups[cid] = [];
-      groups[cid].push(p);
-    });
-    Object.entries(groups).forEach(([cid, pcs]) => {
-      const lbl = document.createElement('div');
-      lbl.className = 'cat-label';
-      lbl.textContent = catMap ? (catMap[cid]?.name || 'Other') : 'Pieces';
-      sb.appendChild(lbl);
-      pcs.forEach(p => {
-        const psRow = getPieceSizeRow(p.id, activeNomId);
-        if (!psRow) return;
-        const btn = document.createElement('div');
-        btn.className = 'piece-btn';
-        btn.draggable = true;
-        btn.dataset.pieceId = p.id;
-        btn.innerHTML = `${makeSVG(p, activeNomId)}<span>${p.name || p.slug}${psRow.unit_cost_usd ? ' — $' + Number(psRow.unit_cost_usd).toFixed(2) : ''}</span>`;
-        btn.addEventListener('dragstart', e => {
-          dragging = { type: 'sidebar', pieceId: p.id };
-          e.dataTransfer.effectAllowed = 'copy';
-        });
-        sb.appendChild(btn);
-      });
-    });
-  }
-
-  function renderDotGrid() {
-    const dg = document.getElementById('dotgrid');
-    const W = dg.clientWidth, H = dg.clientHeight;
-    const step = 20;
-    let dots = '';
-    for (let x = 0; x < W; x += step)
-      for (let y = 0; y < H; y += step)
-        dots += `<circle cx="${x}" cy="${y}" r="1" fill="#1e2a3a"/>`;
-    dg.innerHTML = dots;
-  }
-
-  function renderAll() {
-    const cvs = document.getElementById('canvas');
-    cvs.innerHTML = '';
-    const g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
-    placed.forEach(pl => {
-      const piece = pieces.find(p => p.id === pl.pieceId);
-      if (!piece) return;
-      const svgStr = makeSVG(piece, pl.nomId);
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(svgStr, 'image/svg+xml');
-      const inner = doc.documentElement;
-      const w = +inner.getAttribute('width') || 40;
-      const h = +inner.getAttribute('height') || 40;
-      const grp = document.createElementNS(SVG_NS, 'g');
-      grp.setAttribute('class', 'placed-piece' + (selected === pl.id ? ' selected' : ''));
-      grp.setAttribute('data-id', pl.id);
-      const cx = pl.x, cy = pl.y;
-      let tfm = `translate(${cx},${cy})`;
-      if (pl.rotation) tfm += ` rotate(${pl.rotation},${w/2},${h/2})`;
-      if (pl.flipped) tfm += ` scale(-1,1) translate(${-w},0)`;
-      grp.setAttribute('transform', tfm);
-      const border = document.createElementNS(SVG_NS, 'rect');
-      border.setAttribute('class', 'sel-border');
-      border.setAttribute('x', -3); border.setAttribute('y', -3);
-      border.setAttribute('width', w + 6); border.setAttribute('height', h + 6);
-      border.setAttribute('rx', 4); border.setAttribute('fill', 'none');
-      if (selected === pl.id) border.setAttribute('stroke', '#e2c97e');
-      grp.appendChild(border);
-      Array.from(inner.childNodes).forEach(n => grp.appendChild(n.cloneNode(true)));
-      grp.addEventListener('mouseenter', e => showTooltip(e, pl));
-      grp.addEventListener('mousemove',  e => positionTooltip(e));
-      grp.addEventListener('mouseleave', () => hideTooltip());
-      grp.addEventListener('mousedown', e => {
-        hideTooltip();
-        e.stopPropagation();
-        selected = pl.id;
-        dragging = { type: 'placed', id: pl.id, startX: e.clientX, startY: e.clientY, origX: pl.x, origY: pl.y };
-        renderAll();
-      });
-      g.appendChild(grp);
-    });
-    cvs.appendChild(g);
-    updateBOM();
-  }
-
-  function updateBOM() {
-    const bar = document.getElementById('bom-bar');
-    bar.querySelectorAll('.bom-item').forEach(el => el.remove());
-    const counts = {};
-    placed.forEach(pl => {
-      const piece = pieces.find(p => p.id === pl.pieceId);
-      const nom = nominalSizes.find(n => n.id === pl.nomId);
-      const key = `${nom?.label || ''} ${piece?.name || piece?.slug || ''}`;
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    Object.entries(counts).forEach(([k, v]) => {
-      const span = document.createElement('span');
-      span.className = 'bom-item';
-      span.textContent = `${k} × ${v}`;
-      document.getElementById('export-btn').before(span);
-    });
-  }
-
-  const canvasWrap = document.getElementById('canvas-wrap');
-  canvasWrap.addEventListener('dragover', e => e.preventDefault());
-  canvasWrap.addEventListener('drop', e => {
-    e.preventDefault();
-    if (!dragging || dragging.type !== 'sidebar') return;
+  function addBlock(){
     const rect = canvasWrap.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panX) / zoom;
-    const y = (e.clientY - rect.top - panY) / zoom;
-    placed.push({ id: nextId++, pieceId: dragging.pieceId, nomId: activeNomId, x, y, rotation: 0, flipped: false });
-    dragging = null;
-    renderAll();
-  });
+    const c = screenToWorld(rect.width/2, rect.height/2);
+    const b = newBlock(c.x-80, c.y-35);
+    state.blocks.push(b);
+    render();
+    selectItem('block', b.id);
+  }
 
-  document.addEventListener('mousemove', e => {
-    if (!dragging || dragging.type !== 'placed') return;
-    const dx = (e.clientX - dragging.startX) / zoom;
-    const dy = (e.clientY - dragging.startY) / zoom;
-    const pl = placed.find(p => p.id === dragging.id);
-    if (pl) { pl.x = dragging.origX + dx; pl.y = dragging.origY + dy; }
-    renderAll();
-  });
-  document.addEventListener('mouseup', () => { if (dragging?.type === 'placed') dragging = null; });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeModals(); }
-    if (e.key === 'r' || e.key === 'R') rotateSel(15);
-    if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
-  });
+  function portPositions(b){
+    return {
+      top:{x:b.x+b.w/2, y:b.y},
+      bottom:{x:b.x+b.w/2, y:b.y+b.h},
+      left:{x:b.x, y:b.y+b.h/2},
+      right:{x:b.x+b.w, y:b.y+b.h/2}
+    };
+  }
 
-  let panning = false, panStart = {};
-  canvasWrap.addEventListener('wheel', e => {
+  function nearestPorts(a,b){
+    const pa = portPositions(a), pb = portPositions(b);
+    let best=null,bd=Infinity;
+    for(const ka in pa) for(const kb in pb){
+      const dx=pa[ka].x-pb[kb].x, dy=pa[ka].y-pb[kb].y;
+      const d=dx*dx+dy*dy;
+      if(d<bd){bd=d;best={from:pa[ka],to:pb[kb]};}
+    }
+    return best;
+  }
+
+  function bezierPath(p1,p2){
+    const dx = (p2.x-p1.x)*0.5;
+    return `M ${p1.x},${p1.y} C ${p1.x+dx},${p1.y} ${p2.x-dx},${p2.y} ${p2.x},${p2.y}`;
+  }
+
+  function findBlock(id){ return state.blocks.find(b=>b.id===id); }
+
+  function render(){
+    blocksLayer.innerHTML = '';
+    threadsLayer.innerHTML = '';
+
+    state.threads.forEach(t=>{
+      const a = findBlock(t.fromId), b = findBlock(t.toId);
+      if(!a||!b) return;
+      const pts = nearestPorts(a,b);
+      const g = document.createElementNS(NS,'g');
+      const path = document.createElementNS(NS,'path');
+      path.setAttribute('class','thread-path' + (selected.type==='thread'&&selected.id===t.id?' selected':''));
+      path.setAttribute('d', bezierPath(pts.from, pts.to));
+      path.setAttribute('marker-end','url(#arrow)');
+      path.dataset.id = t.id;
+      path.addEventListener('mousedown', e=>{ e.stopPropagation(); selectItem('thread', t.id); });
+      path.addEventListener('dblclick', e=>{ e.stopPropagation(); openThreadModal(t.id); });
+      g.appendChild(path);
+      if(t.label){
+        const mx=(pts.from.x+pts.to.x)/2, my=(pts.from.y+pts.to.y)/2;
+        const label = document.createElementNS(NS,'text');
+        label.setAttribute('class','thread-label');
+        label.setAttribute('x', mx); label.setAttribute('y', my-6);
+        label.textContent = t.label;
+        g.appendChild(label);
+      }
+      threadsLayer.appendChild(g);
+    });
+
+    state.blocks.forEach(b=>{
+      const g = document.createElementNS(NS,'g');
+      g.setAttribute('class','block-card');
+      g.dataset.id = b.id;
+
+      const rect = document.createElementNS(NS,'rect');
+      rect.setAttribute('class','block-rect' + (selected.type==='block'&&selected.id===b.id?' selected':''));
+      rect.setAttribute('x', b.x); rect.setAttribute('y', b.y);
+      rect.setAttribute('width', b.w); rect.setAttribute('height', b.h);
+      rect.setAttribute('rx', 8);
+      rect.setAttribute('fill', b.color || '#1c2436');
+      g.appendChild(rect);
+
+      const tag = document.createElementNS(NS,'text');
+      tag.setAttribute('class','block-tag');
+      tag.setAttribute('x', b.x+10); tag.setAttribute('y', b.y+16);
+      tag.textContent = b.tag;
+      g.appendChild(tag);
+
+      const title = document.createElementNS(NS,'text');
+      title.setAttribute('class','block-title');
+      title.setAttribute('x', b.x+10); title.setAttribute('y', b.y+34);
+      title.textContent = b.label;
+      g.appendChild(title);
+
+      const desc = document.createElementNS(NS,'text');
+      desc.setAttribute('class','block-desc');
+      desc.setAttribute('x', b.x+10); desc.setAttribute('y', b.y+52);
+      desc.textContent = (b.desc||'').slice(0,28);
+      g.appendChild(desc);
+
+      const ports = portPositions(b);
+      Object.values(ports).forEach(p=>{
+        const c = document.createElementNS(NS,'circle');
+        c.setAttribute('class','port');
+        c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); c.setAttribute('r', 4);
+        g.appendChild(c);
+      });
+
+      g.addEventListener('mousedown', e=>{
+        e.stopPropagation();
+        if(tool==='connect'){
+          if(!connectFrom){ connectFrom = b.id; toast('Click target block to connect'); }
+          else if(connectFrom !== b.id){
+            const th = { id: uid('t'), tag:'LINK-'+Math.floor(Math.random()*900+100),
+              label:'', desc:'', fromId: connectFrom, toId: b.id };
+            state.threads.push(th);
+            connectFrom = null;
+            render();
+          }
+          return;
+        }
+        selectItem('block', b.id);
+        const rectB = canvasWrap.getBoundingClientRect();
+        const start = screenToWorld(e.clientX-rectB.left, e.clientY-rectB.top);
+        dragging = { id:b.id, offX: start.x-b.x, offY: start.y-b.y };
+      });
+      g.addEventListener('dblclick', e=>{ e.stopPropagation(); openBlockModal(b.id); });
+
+      blocksLayer.appendChild(g);
+    });
+  }
+
+  function selectItem(type,id){ selected = {type,id}; render(); }
+  function deleteSelected(){
+    if(!selected.type) return;
+    if(selected.type==='block'){
+      state.blocks = state.blocks.filter(b=>b.id!==selected.id);
+      state.threads = state.threads.filter(t=>t.fromId!==selected.id && t.toId!==selected.id);
+    } else if(selected.type==='thread'){
+      state.threads = state.threads.filter(t=>t.id!==selected.id);
+    }
+    selected = {type:null,id:null};
+    render();
+  }
+
+  // ---- Pan / Zoom ----
+  canvasWrap.addEventListener('mousedown', e=>{
+    if(e.target === svg || e.target.id==='viewport'){
+      panStart = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y };
+      selected = {type:null,id:null}; render();
+    }
+  });
+  window.addEventListener('mousemove', e=>{
+    const rect = canvasWrap.getBoundingClientRect();
+    if(dragging){
+      const w = screenToWorld(e.clientX-rect.left, e.clientY-rect.top);
+      const b = findBlock(dragging.id);
+      if(b){ b.x = w.x - dragging.offX; b.y = w.y - dragging.offY; render(); }
+    } else if(panStart){
+      view.x = panStart.vx + (e.clientX - panStart.x);
+      view.y = panStart.vy + (e.clientY - panStart.y);
+      applyView();
+    }
+  });
+  window.addEventListener('mouseup', ()=>{ dragging=null; panStart=null; });
+
+  canvasWrap.addEventListener('wheel', e=>{
     e.preventDefault();
-    zoom = Math.max(0.2, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
-    renderAll();
-  }, { passive: false });
-  canvasWrap.addEventListener('mousedown', e => {
-    if (e.target === document.getElementById('canvas') || e.target.closest('#dotgrid')) {
-      panning = true; panStart = { x: e.clientX - panX, y: e.clientY - panY };
-      selected = null; renderAll();
-    }
-  });
-  document.addEventListener('mousemove', e => {
-    if (!panning) return;
-    panX = e.clientX - panStart.x;
-    panY = e.clientY - panStart.y;
-    renderAll();
-  });
-  document.addEventListener('mouseup', () => { panning = false; });
+    const rect = canvasWrap.getBoundingClientRect();
+    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+    const before = screenToWorld(mx,my);
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    view.scale = Math.min(3, Math.max(0.2, view.scale*factor));
+    const after = { x: before.x*view.scale + view.x, y: before.y*view.scale + view.y };
+    view.x += mx-after.x; view.y += my-after.y;
+    applyView();
+  }, { passive:false });
 
-  function rotateSel(deg) {
-    if (!selected) return;
-    const pl = placed.find(p => p.id === selected);
-    if (pl) { pl.rotation = ((pl.rotation || 0) + deg) % 360; renderAll(); }
-  }
-  function deleteSel() {
-    if (!selected) return;
-    placed = placed.filter(p => p.id !== selected);
-    selected = null; renderAll();
-  }
-  document.getElementById('btn-rotate-ccw').onclick = () => rotateSel(-15);
-  document.getElementById('btn-rotate-cw').onclick  = () => rotateSel(15);
-  document.getElementById('btn-flip').onclick = () => {
-    if (!selected) return;
-    const pl = placed.find(p => p.id === selected);
-    if (pl) { pl.flipped = !pl.flipped; renderAll(); }
-  };
-  document.getElementById('btn-delete').onclick = deleteSel;
-  document.getElementById('btn-zoom-in').onclick  = () => { zoom = Math.min(4, zoom * 1.2); renderAll(); };
-  document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.2, zoom * 0.8); renderAll(); };
-  document.getElementById('btn-clear').onclick = () => { if (confirm('Clear canvas?')) { placed = []; selected = null; renderAll(); } };
-
-  function closeModals() {
-    document.getElementById('save-modal').classList.add('hidden');
-    document.getElementById('load-modal').classList.add('hidden');
-  }
-
-  // ── Export ────────────────────────────────────────────────────────────────
-  document.getElementById('export-btn').onclick = () => {
-    const counts = {};
-    placed.forEach(pl => {
-      const piece = pieces.find(p => p.id === pl.pieceId);
-      const nom = nominalSizes.find(n => n.id === pl.nomId);
-      const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
-      const key = `${nom?.label || '?'} ${piece?.name || piece?.slug || '?'}`;
-      if (!counts[key]) counts[key] = { qty: 0, sku: psRow?.sku, cost: psRow?.unit_cost_usd };
-      counts[key].qty++;
+  function fitToScreen(){
+    if(state.blocks.length===0){ view={x:0,y:0,scale:1}; applyView(); return; }
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    state.blocks.forEach(b=>{
+      minX=Math.min(minX,b.x); minY=Math.min(minY,b.y);
+      maxX=Math.max(maxX,b.x+b.w); maxY=Math.max(maxY,b.y+b.h);
     });
-    let txt = 'PIPE PUZZLE BUILDER — PARTS LIST\n' + '='.repeat(36) + '\n\n';
-    let total = 0;
-    Object.entries(counts).forEach(([k, v]) => {
-      const line_cost = v.cost ? (v.qty * parseFloat(v.cost)) : null;
-      if (line_cost) total += line_cost;
-      txt += `${v.qty}x  ${k}${v.sku ? '  [' + v.sku + ']' : ''}${line_cost ? '  $' + line_cost.toFixed(2) : ''}\n`;
-    });
-    if (total) txt += '\n' + '-'.repeat(36) + `\nEstimated Total: $${total.toFixed(2)}\n`;
-    txt += '\nPrices are approximate Home Depot retail. Verify availability before purchase.';
-    const blob = new Blob([txt], { type: 'text/plain' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'pipe-parts-list.txt'; a.click();
-  };
-
-  // ── Save modal ────────────────────────────────────────────────────────────
-  document.getElementById('save-btn').onclick = () => {
-    document.getElementById('save-title').value = '';
-    document.getElementById('save-modal').classList.remove('hidden');
-    setTimeout(() => document.getElementById('save-title').focus(), 50);
-  };
-  document.getElementById('save-modal-cancel').onclick = closeModals;
-  document.getElementById('save-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('save-modal')) closeModals();
-  });
-
-  document.getElementById('save-modal-confirm').onclick = async () => {
-    const titleVal = document.getElementById('save-title').value.trim() || 'Untitled Assembly';
-    document.getElementById('save-modal-confirm').textContent = 'Saving…';
-    document.getElementById('save-modal-confirm').disabled = true;
-    try {
-      const token = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
-      await sbFetch('pipe_assemblies', {
-        method: 'POST',
-        body: JSON.stringify({ share_token: token, title: titleVal }),
-        prefer: 'return=minimal'
-      });
-      const assemblies = await sbFetch(`pipe_assemblies?share_token=eq.${token}&select=id`);
-      const assembly = assemblies?.[0];
-      if (!assembly) throw new Error('Assembly not found after insert');
-      const rows = placed.map(pl => {
-        const psRow = getPieceSizeRow(pl.pieceId, pl.nomId);
-        return {
-          assembly_id: assembly.id,
-          piece_size_id: psRow.id,
-          piece_id: pl.pieceId,
-          nominal_size_id: pl.nomId,
-          pos_x: Math.round(pl.x),
-          pos_y: Math.round(pl.y),
-          rotation_deg: pl.rotation || 0,
-          flipped: pl.flipped || false
-        };
-      });
-      if (rows.length) {
-        await sbFetch('pipe_assembly_pieces', {
-          method: 'POST',
-          body: JSON.stringify(rows),
-          prefer: 'return=minimal'
-        });
-      }
-      closeModals();
-      const url = `${location.origin}${location.pathname}?s=${token}`;
-      const bar = document.getElementById('share-bar');
-      const link = document.getElementById('share-link');
-      link.href = url; link.textContent = url;
-      bar.style.display = 'flex';
-      setTimeout(() => bar.style.display = 'none', 8000);
-    } catch(err) {
-      alert('Save failed: ' + err.message);
-    } finally {
-      document.getElementById('save-modal-confirm').textContent = 'Save & Get Link';
-      document.getElementById('save-modal-confirm').disabled = false;
-    }
-  };
-
-  // ── Load modal ────────────────────────────────────────────────────────────
-  document.getElementById('load-btn').onclick = async () => {
-    document.getElementById('load-modal').classList.remove('hidden');
-    const list = document.getElementById('designs-list');
-    list.innerHTML = '<div class="designs-empty">Loading…</div>';
-    try {
-      const rows = await sbFetch('pipe_assemblies?order=created_at.desc&limit=50&select=id,title,share_token,created_at');
-      list.innerHTML = '';
-      if (!rows || rows.length === 0) {
-        list.innerHTML = '<div class="designs-empty">No saved designs yet.</div>';
-        return;
-      }
-      rows.forEach(r => {
-        const row = document.createElement('div');
-        row.className = 'design-row';
-        const d = new Date(r.created_at);
-        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-          + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-        row.innerHTML = `<span class="dr-title">${r.title || 'Untitled Assembly'}</span><span class="dr-date">${dateStr}</span>`;
-        row.addEventListener('click', async () => {
-          closeModals();
-          placed = []; selected = null;
-          await loadAssembly(r.share_token);
-          renderAll();
-          history.replaceState(null, '', `${location.pathname}?s=${r.share_token}`);
-        });
-        list.appendChild(row);
-      });
-    } catch(e) {
-      list.innerHTML = '<div class="designs-empty">Error loading designs.</div>';
-    }
-  };
-  document.getElementById('load-modal-cancel').onclick = closeModals;
-  document.getElementById('load-modal').addEventListener('click', e => {
-    if (e.target === document.getElementById('load-modal')) closeModals();
-  });
-
-  // ── Load shared assembly ──────────────────────────────────────────────────
-  async function loadAssembly(token) {
-    try {
-      const [assembly] = await sbFetch(`pipe_assemblies?share_token=eq.${token}`);
-      if (!assembly) return;
-      const pcs = await sbFetch(`pipe_assembly_pieces?assembly_id=eq.${assembly.id}`);
-      placed = pcs.map(r => ({
-        id: nextId++,
-        pieceId: r.piece_id,
-        nomId: r.nominal_size_id,
-        x: r.pos_x,
-        y: r.pos_y,
-        rotation: r.rotation_deg || 0,
-        flipped: r.flipped || false
-      }));
-    } catch(e) { console.warn('Could not load shared assembly', e); }
+    const rect = canvasWrap.getBoundingClientRect();
+    const w = maxX-minX+80, h = maxY-minY+80;
+    const scale = Math.min(rect.width/w, rect.height/h, 2);
+    view.scale = scale;
+    view.x = rect.width/2 - ((minX+maxX)/2)*scale;
+    view.y = rect.height/2 - ((minY+maxY)/2)*scale;
+    applyView();
   }
 
-  window.addEventListener('resize', renderDotGrid);
-  renderDotGrid();
-  loadCatalog().then(() => renderAll());
+  // ---- Toolbar ----
+  document.getElementById('btnSelect').addEventListener('click', ()=>setTool('select'));
+  document.getElementById('btnConnect').addEventListener('click', ()=>setTool('connect'));
+  document.getElementById('btnAddBlock').addEventListener('click', addBlock);
+  document.getElementById('btnFit').addEventListener('click', fitToScreen);
+
+  function setTool(t){
+    tool = t; connectFrom = null;
+    document.getElementById('btnSelect').classList.toggle('active', t==='select');
+    document.getElementById('btnConnect').classList.toggle('active', t==='connect');
+    canvasWrap.classList.toggle('connecting', t==='connect');
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='TEXTAREA') return;
+    if(e.key==='v'||e.key==='V') setTool('select');
+    else if(e.key==='c'||e.key==='C') setTool('connect');
+    else if(e.key==='n'||e.key==='N') addBlock();
+    else if(e.key==='Delete'||e.key==='Backspace') deleteSelected();
+    else if(e.key==='Escape'){ connectFrom=null; selected={type:null,id:null}; render(); }
+    else if(e.key==='Enter'){
+      if(selected.type==='block') openBlockModal(selected.id);
+      else if(selected.type==='thread') openThreadModal(selected.id);
+    }
+  });
+
+  // ---- Modals ----
+  const overlay = document.getElementById('modalOverlay');
+  const modalContent = document.getElementById('modalContent');
+  function closeModal(){ overlay.classList.remove('show'); modalContent.innerHTML=''; }
+  overlay.addEventListener('mousedown', e=>{ if(e.target===overlay) closeModal(); });
+
+  function openBlockModal(id){
+    const b = findBlock(id); if(!b) return;
+    modalContent.innerHTML = `
+      <h3>Edit Block</h3>
+      <label>ID / Tag</label><input type="text" id="m_tag" value="${escapeHtml(b.tag)}">
+      <label>Title</label><input type="text" id="m_label" value="${escapeHtml(b.label)}">
+      <label>Description</label><textarea id="m_desc">${escapeHtml(b.desc||'')}</textarea>
+      <label>Color</label><input type="color" id="m_color" value="${b.color||'#0f3460'}">
+      <div class="actions">
+        <div class="left"><button id="m_delete">Delete</button></div>
+        <div><button id="m_cancel">Cancel</button> <button id="m_save">Save</button></div>
+      </div>`;
+    overlay.classList.add('show');
+    document.getElementById('m_cancel').onclick = closeModal;
+    document.getElementById('m_save').onclick = ()=>{
+      b.tag = document.getElementById('m_tag').value || b.tag;
+      b.label = document.getElementById('m_label').value || b.label;
+      b.desc = document.getElementById('m_desc').value;
+      b.color = document.getElementById('m_color').value;
+      closeModal(); render();
+    };
+    document.getElementById('m_delete').onclick = ()=>{
+      state.blocks = state.blocks.filter(x=>x.id!==id);
+      state.threads = state.threads.filter(t=>t.fromId!==id && t.toId!==id);
+      closeModal(); render();
+    };
+  }
+
+  function openThreadModal(id){
+    const t = state.threads.find(x=>x.id===id); if(!t) return;
+    modalContent.innerHTML = `
+      <h3>Edit Thread</h3>
+      <label>ID / Tag</label><input type="text" id="m_tag" value="${escapeHtml(t.tag||'')}">
+      <label>Label</label><input type="text" id="m_label" value="${escapeHtml(t.label||'')}">
+      <label>Description</label><textarea id="m_desc">${escapeHtml(t.desc||'')}</textarea>
+      <div class="actions">
+        <div class="left"><button id="m_delete">Delete</button></div>
+        <div><button id="m_cancel">Cancel</button> <button id="m_save">Save</button></div>
+      </div>`;
+    overlay.classList.add('show');
+    document.getElementById('m_cancel').onclick = closeModal;
+    document.getElementById('m_save').onclick = ()=>{
+      t.tag = document.getElementById('m_tag').value;
+      t.label = document.getElementById('m_label').value;
+      t.desc = document.getElementById('m_desc').value;
+      closeModal(); render();
+    };
+    document.getElementById('m_delete').onclick = ()=>{
+      state.threads = state.threads.filter(x=>x.id!==id);
+      closeModal(); render();
+    };
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---- Save / Load (localStorage) ----
+  const STORAGE_KEY = 'blockThreadNotes_boards';
+  function getAllBoards(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }catch(e){ return {}; }
+  }
+  function saveBoard(){
+    const name = boardNameInput.value.trim() || 'Untitled Board';
+    const boards = getAllBoards();
+    boards[name] = { name, blocks: state.blocks, threads: state.threads, savedAt: Date.now() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
+    toast('Saved "' + name + '"');
+  }
+  function loadBoard(name){
+    const boards = getAllBoards();
+    const board = boards[name];
+    if(!board) return;
+    state.blocks = board.blocks || [];
+    state.threads = board.threads || [];
+    boardNameInput.value = board.name;
+    selected = {type:null,id:null};
+    render(); fitToScreen();
+    closeModal();
+    toast('Loaded "' + name + '"');
+  }
+  function deleteBoard(name){
+    const boards = getAllBoards();
+    delete boards[name];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
+    openBoardsModal();
+  }
+  function openBoardsModal(){
+    const boards = getAllBoards();
+    const names = Object.keys(boards).sort();
+    modalContent.innerHTML = `
+      <h3>Saved Boards</h3>
+      <div id="boardsList">
+        ${names.length ? names.map(n=>`
+          <div class="boardRow">
+            <span>${escapeHtml(n)}</span>
+            <span>
+              <button data-load="${escapeHtml(n)}">Load</button>
+              <button data-del="${escapeHtml(n)}">Delete</button>
+            </span>
+          </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">No saved boards yet.</p>'}
+      </div>
+      <div class="actions"><div></div><button id="m_close">Close</button></div>`;
+    overlay.classList.add('show');
+    document.getElementById('m_close').onclick = closeModal;
+    modalContent.querySelectorAll('[data-load]').forEach(btn=>{
+      btn.onclick = ()=> loadBoard(btn.dataset.load);
+    });
+    modalContent.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.onclick = ()=> deleteBoard(btn.dataset.del);
+    });
+  }
+
+  // ---- URL hash share ----
+  function encodeState(){
+    const payload = { name: boardNameInput.value, blocks: state.blocks, threads: state.threads };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  }
+  function decodeState(str){
+    return JSON.parse(decodeURIComponent(escape(atob(str))));
+  }
+  function copyShareLink(){
+    const hash = encodeState();
+    const url = location.origin + location.pathname + '#b=' + hash;
+    navigator.clipboard.writeText(url).then(()=> toast('Link copied to clipboard'))
+      .catch(()=> toast('Could not copy — copy manually from address bar'));
+    history.replaceState(null, '', '#b=' + hash);
+  }
+  function loadFromHash(){
+    const h = location.hash;
+    if(h.startsWith('#b=')){
+      try{
+        const data = decodeState(h.slice(3));
+        state.blocks = data.blocks || [];
+        state.threads = data.threads || [];
+        boardNameInput.value = data.name || 'Shared Board';
+        render(); fitToScreen();
+        toast('Board loaded from link');
+      }catch(e){ console.error(e); }
+    }
+  }
+
+  // ---- JSON export / import ----
+  function downloadFile(filename, content, mime){
+    const blob = new Blob([content], { type: mime });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportJson(){
+    const name = boardNameInput.value.trim() || 'board';
+    const payload = { name, blocks: state.blocks, threads: state.threads, exportedAt: new Date().toISOString() };
+    downloadFile(name.replace(/[^a-z0-9-_]+/gi,'_') + '.json', JSON.stringify(payload, null, 2), 'application/json');
+    toast('Exported ' + name + '.json');
+  }
+
+  function importJsonFile(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        state.blocks = data.blocks || [];
+        state.threads = data.threads || [];
+        boardNameInput.value = data.name || 'Imported Board';
+        selected = {type:null,id:null};
+        render(); fitToScreen();
+        toast('Imported "' + boardNameInput.value + '"');
+      }catch(e){ toast('Invalid JSON file'); console.error(e); }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---- CSV export ----
+  function csvEscape(v){
+    v = String(v ?? '');
+    if(/[",\n]/.test(v)) return '"' + v.replace(/"/g,'""') + '"';
+    return v;
+  }
+  function exportCsv(){
+    const blockHeaders = ['id','tag','label','description','x','y','width','height','color'];
+    const blockRows = state.blocks.map(b => [b.id,b.tag,b.label,b.desc,b.x,b.y,b.w,b.h,b.color]);
+    const blocksCsv = [blockHeaders.join(','), ...blockRows.map(r=>r.map(csvEscape).join(','))].join('\n');
+
+    const threadHeaders = ['id','tag','label','description','from_block_id','to_block_id'];
+    const threadRows = state.threads.map(t => [t.id,t.tag,t.label,t.desc,t.fromId,t.toId]);
+    const threadsCsv = [threadHeaders.join(','), ...threadRows.map(r=>r.map(csvEscape).join(','))].join('\n');
+
+    downloadFile('blocks.csv', blocksCsv, 'text/csv');
+    downloadFile('threads.csv', threadsCsv, 'text/csv');
+    toast('Exported blocks.csv and threads.csv');
+  }
+
+  // ---- Wire up buttons ----
+  document.getElementById('btnSave').addEventListener('click', saveBoard);
+  document.getElementById('btnBoards').addEventListener('click', openBoardsModal);
+  document.getElementById('btnCopyLink').addEventListener('click', copyShareLink);
+  document.getElementById('btnExportJson').addEventListener('click', exportJson);
+  document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+
+  const fileInput = document.getElementById('fileImportInput');
+  document.getElementById('btnImportJson').addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', e=>{
+    if(e.target.files && e.target.files[0]) importJsonFile(e.target.files[0]);
+    fileInput.value = '';
+  });
+
+  // ---- Init ----
+  loadFromHash();
+  if(state.blocks.length===0){
+    state.blocks.push(newBlock(-160,-60));
+    state.blocks.push(newBlock(80,60));
+    state.threads.push({ id:uid('t'), tag:'LINK-100', label:'related to',
+      desc:'', fromId: state.blocks[0].id, toId: state.blocks[1].id });
+  }
+  render();
+  applyView();
+  window.addEventListener('resize', fitToScreen);
+  setTimeout(fitToScreen, 50);
+})();
 </script>
 </body>
 </html>
