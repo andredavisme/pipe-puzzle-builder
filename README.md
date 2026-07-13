@@ -1,72 +1,100 @@
-# Pipe Puzzle Builder
+# Block Thread Notes
 
-**🔗 Live site: [andredavisme.github.io/pipe-puzzle-builder](https://andredavisme.github.io/pipe-puzzle-builder)**
+**🧩 Live site: [andredavisme.github.io/pipe-puzzle-builder](https://andredavisme.github.io/pipe-puzzle-builder)**
 
-An interactive 2D drag-and-drop visualizer for assembling galvanized steel pipe projects — like building in-store, but online.
+A freeform visual note-taking app built on an SVG canvas. Organize ideas as **blocks** connected by **threads** — each with an ID, title, and description for project tracking and brainstorming.
+
+Built as a branch of [pipe-puzzle-builder](https://github.com/andredavisme/pipe-puzzle-builder), reusing its SVG canvas, pan/zoom, and dark UI patterns.
+
+---
 
 ## Features
 
-- **Visual catalog** — all pieces rendered as SVGs with a galvanized steel look (threaded ends, metallic gradient)
-- **Relative sizing** — a ½" tee is visibly smaller than a 2" tee
-- **Nominal size tabs** — switch ½" through 2"; all pieces rescale instantly
-- **Drag & drop canvas** — place pieces, rotate (R key or buttons), flip, delete
-- **Live BOM** — running parts count at the bottom
-- **Export list** — downloads a plain-text parts list for Home Depot / Lowes
-- **Save & share** — writes to Supabase; returns a shareable `?s=<token>` URL
-- **Load designs** — browse and restore any previously saved assembly
-- **Supabase catalog backend** — pieces, sizes, SKUs, and pricing from real Southland/STZ data
+- **Blocks** — draggable cards with ID/tag, title, description, and color
+- **Threads** — bezier curves connecting blocks, each with its own ID and label
+- **Connect mode** — click two blocks to draw a thread between them (auto port selection)
+- **Arrowheads** — threads show direction
+- **Double-click to edit** — opens a modal for any block or thread
+- **localStorage save/load** — boards persist in the browser; browse and restore from the Boards panel
+- **Copy Link** — base64-encodes the full board state into a URL hash for zero-dependency sharing
+- **Import from link** — opening a shared URL auto-loads the board
+- **Fit to screen** — centers and scales all blocks into view
+- **Keyboard shortcuts** — see below
+- **Dot-grid canvas** — same aesthetic as Pipe Puzzle Builder
 
-## Example Designs
+---
 
-| Design | Description | Link |
-|---|---|---|
-| **Indian Club** | A [club-shaped exercise tool](https://en.wikipedia.org/wiki/Indian_club) swung for shoulder mobility and strength — classic gym equipment made from pipe fittings | [Open design →](https://andredavisme.github.io/pipe-puzzle-builder/?s=0c3d4fb0762631ba) |
+## Keyboard Shortcuts
 
-> ✨ **Try it:** The end cap on the 18" pipe is intentionally missing. Drag a **Cap** from the sidebar onto the open end to complete the club, then hit **Export List** to see the full parts list with SKUs and pricing.
-
-![Indian Club — parts list and canvas view](docs/indian-club.png)
-
-## Piece Catalog
-
-| Category | Pieces |
+| Key | Action |
 |---|---|
-| Pipes | 2", 4", 6", 12", 18", 24", 36" |
-| Fittings | Coupling, Cap, 90° Elbow, 45° Elbow, Tee, Cross, Union, Close Nipple |
-| Reducers | Hex Bushing, Bell Reducer Coupling |
-| Flanges | Floor Flange |
+| `V` | Select / move tool |
+| `C` | Connect tool |
+| `N` | Add new block |
+| `Enter` | Edit selected block or thread |
+| `Delete` / `Backspace` | Delete selected block or thread |
+| `Esc` | Deselect / cancel connect |
+| Scroll wheel | Zoom in / out |
+| Drag background | Pan canvas |
 
-Nominal sizes: ½", ¾", 1", 1¼", 1½", 2"
+---
 
-## Setup
+## Data Model
 
-1. Clone this repo
-2. Open `index.html` directly in a browser, or deploy to GitHub Pages / Netlify / Cloudflare Pages
-3. The Supabase project is pre-configured — no additional setup needed for read-only catalog browsing
+### Block
+```json
+{
+  "id": "b1k3x9",
+  "tag": "PROJ-001",
+  "label": "Research Phase",
+  "desc": "Gather requirements and competitive analysis",
+  "x": 120, "y": 80, "w": 160, "h": 70,
+  "color": "#0f3460"
+}
+```
 
-## Supabase Schema
+### Thread
+```json
+{
+  "id": "tabc123",
+  "tag": "LINK-001",
+  "label": "leads to",
+  "desc": "Research feeds directly into planning",
+  "fromId": "b1k3x9",
+  "toId": "bxyz456"
+}
+```
 
-| Table | Purpose |
+---
+
+## Storage
+
+| Method | How it works |
 |---|---|
-| `pipe_nominal_sizes` | ½"–2" nominal sizes with true ODs |
-| `pipe_categories` | Pipes / Fittings / Reducers / Flanges |
-| `pipe_pieces` | Size-agnostic piece definitions (18 pieces) |
-| `pipe_piece_sizes` | Per-size variant — SKU, price, svg_data (~130 rows) |
-| `pipe_assemblies` | Named saved assemblies with share_token |
-| `pipe_assembly_pieces` | Canvas placement — x/y/rotation per piece per assembly |
+| **localStorage** | Boards saved by name in the browser; persistent across sessions |
+| **URL hash export** | Full board state base64-encoded into `#b=...`; copy/paste to share |
 
-## Brands / SKUs
+No backend, no API keys, no dependencies — fully static.
 
-Catalog is seeded with real **Southland** and **STZ** galvanized steel SKUs sourced from Home Depot product data (approximate retail pricing).
+---
 
 ## Deploy
 
-This is a single-file static app. Deploy `index.html` anywhere:
+Single `index.html` — works anywhere static files are served:
 
 ```bash
-# GitHub Pages — push to main, enable Pages in repo settings
-# Netlify — drag index.html into Netlify drop
-# Cloudflare Pages — connect repo, build command: none, publish dir: /
+# GitHub Pages — workflow in .github/workflows/deploy-block-thread-notes.yml
+# Netlify      — drag block-thread-notes/index.html into Netlify drop
+# Cloudflare   — connect repo, publish dir: block-thread-notes
 ```
+
+---
+
+## Related
+
+- **[Pipe Puzzle Builder](https://github.com/andredavisme/pipe-puzzle-builder/tree/main)** — the parent project; drag-and-drop pipe fitting visualizer with Supabase catalog backend
+
+---
 
 ## License
 
