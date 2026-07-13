@@ -20,12 +20,12 @@ Follow these 8 steps to create your first board:
    - **Description** — supporting detail or notes
    - **Color** — pick a color to categorize visually
 4. **Move blocks** — Drag any block to reposition it on the canvas. Pan the canvas by dragging the background. Zoom with the scroll wheel.
-5. **Connect two blocks** — Press `C` (or click ⬡ in the toolbar) to enter **Connect mode**. Click block A, then click block B. A bezier thread is drawn between them automatically.
+5. **Connect two blocks** — Press `C` (or click the connect button) to enter **Connect mode**. Click block A, then click block B. A bezier thread is drawn between them automatically.
 6. **Edit a thread** — Double-click a thread to give it an ID, label (e.g. "leads to", "depends on"), and description.
 7. **Save your work** — Click **💾 Save** at any time to update the board in localStorage. You can save multiple boards and switch between them from the **📂 Boards** panel.
-8. **Share the board** — Click **🔗 Copy Link**. This encodes the entire board into a URL hash and copies it to your clipboard. Anyone who opens that link will see your exact board — no login required.
+8. **Share or back up the board** — Click **🔗 Copy Link** for a live share link, or **📥 Export JSON** for a downloadable backup file.
 
-**Fit to screen:** Press ⊡ or the fit button to zoom all blocks into view at once.
+**Fit to screen:** Press **⊡ Fit** to zoom all blocks into view at once.
 
 ---
 
@@ -79,29 +79,28 @@ Toggle between **Select mode** (`V`) and **Connect mode** (`C`). In Connect mode
 
 ### How data is saved
 
-There are two independent mechanisms:
+There are now **four ways** to save or share a board:
 
 | Method | Where data lives | Survives browser close? | Cross-browser? | Backup-safe? |
 |---|---|---|---|---|
 | 💾 **Save button** | `localStorage` in that browser | ✅ Yes | ❌ No | ❌ No |
 | 🔗 **Copy Link** | URL hash — no storage at all | N/A | ✅ Yes | ✅ Yes (save the URL) |
+| 📥 **Export JSON** | Downloaded `.json` file | ✅ Yes | ✅ Yes | ✅ Yes |
+| 📊 **Export CSV** | Downloaded `blocks.csv` + `threads.csv` | ✅ Yes | ✅ Yes | ✅ Yes |
 
 ### What "browser-specific" means
-If you save a board in Chrome and later open Firefox (or an Incognito window), your saved boards won't appear — they only exist in the exact browser profile where you saved them. The **Copy Link** button solves this: the link carries the full board state, so it opens identically in any browser, device, or private session.
+If you save a board in Chrome and later open Firefox (or an Incognito window), your saved boards won't appear — they only exist in the exact browser profile where you saved them. **Copy Link**, **Export JSON**, and **Export CSV** all solve this, since the data travels with the link or file rather than staying in browser storage.
 
-### Backup your work
-Right now the safest backup is your **share link** — copy it and store it somewhere (notes app, email, bookmark). Treat it like a save file.
-
-**Coming soon:**
-- 📥 **Export to JSON** — download the full board as a `.json` file you can re-import later
-- 📊 **Export to CSV** — two files (`blocks.csv` and `threads.csv`) in a relational schema ready for database import
-- 📤 **Import from JSON** — drag-drop or file-picker to restore a board from a backup
+### Backing up your work
+- **Quick backup:** Click **📥 Export JSON** to download the full board as a `.json` file. Use **📤 Import JSON** later (any browser, any machine) to restore it exactly.
+- **Database seeding:** Click **📊 Export CSV** to download `blocks.csv` and `threads.csv`. These map directly to relational tables and can be imported into Supabase, PostgreSQL, or any SQL database with no transformation.
+- **Share link:** Still available via **🔗 Copy Link** for lightweight, no-download sharing.
 
 ---
 
 ## Data Model
 
-### Board (URL hash / localStorage)
+### Board (URL hash / localStorage / JSON export)
 ```json
 {
   "name": "My Project Board",
@@ -134,6 +133,20 @@ Right now the safest backup is your **share link** — copy it and store it some
 }
 ```
 
+### CSV Schema
+
+**`blocks.csv`**
+
+**`threads.csv`**
+---
+
+## Repo Structure
+
+This branch contains two `index.html` files:
+
+- **Root `index.html`** — the original pipe-puzzle-builder app, inherited when this branch was created from `main`. Not used by this app's deploy workflow.
+- **`block-thread-notes/index.html`** — the actual note-taking app. This is the only file the deploy workflow publishes.
+
 ---
 
 ## Deploy
@@ -145,6 +158,18 @@ Single `index.html` — works anywhere static files are served:
 # Netlify      — drag block-thread-notes/index.html into Netlify drop
 # Cloudflare   — connect repo, publish dir: block-thread-notes
 ```
+
+### Troubleshooting Deployment
+
+If a GitHub Actions run fails with:
+> "Branch 'block-thread-notes' is not allowed to deploy to github-pages due to environment protection rules."
+
+Fix it by allowing this branch to deploy:
+
+1. Go to **Settings → Environments → github-pages**
+2. Under **Deployment branches and tags**, click **Add deployment branch rule**
+3. Add `block-thread-notes` (or switch to **All branches**)
+4. Re-run the failed workflow from the **Actions** tab
 
 ---
 
