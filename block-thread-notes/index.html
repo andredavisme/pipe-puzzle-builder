@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Block Thread Notes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Header ── */
+    header { background: #16213e; padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #0f3460; flex-shrink: 0; }
+    header h1 { font-size: 1rem; color: #e2c97e; letter-spacing: 1px; }
+    .hdr-btn { padding: 4px 12px; border-radius: 4px; border: 1px solid #0f3460; background: #0f3460; color: #ccc; cursor: pointer; font-size: 0.78rem; }
+    .hdr-btn:hover { background: #1a4a7a; }
+    .hdr-btn.accent { background: #e2c97e; color: #1a1a2e; border-color: #e2c97e; font-weight: 700; }
+    .hdr-btn.green  { background: #4CAF50; color: #fff; border-color: #4CAF50; font-weight: 700; }
+    #board-title { font-size: 0.85rem; color: #aaa; padding: 4px 8px; background: #0f1a2e; border: 1px solid #0f3460; border-radius: 4px; width: 200px; }
+    #board-title:focus { outline: none; border-color: #e2c97e; color: #fff; }
+    .spacer { flex: 1; }
+    #status-msg { font-size: 0.75rem; color: #4CAF50; opacity: 0; transition: opacity 0.4s; }
+    #status-msg.show { opacity: 1; }
+
+    /* ── Canvas ── */
+    #canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0f0f1e; cursor: default; }
+    #dotgrid { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    /* ── Toolbar ── */
+    #toolbar { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .tb-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; color: #ccc; cursor: pointer; font-size: 1rem; user-select: none; }
+    .tb-btn:hover { background: #0f3460; }
+    .tb-btn.active { background: #e2c97e; color: #1a1a2e; border-color: #e2c97e; }
+
+    /* ── Modals ── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 900; }
+    .modal-backdrop.hidden { display: none; }
+    .modal { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; width: 460px; max-width: 95vw; display: flex; flex-direction: column; gap: 12px; }
+    .modal h2 { font-size: 1rem; color: #e2c97e; }
+    .modal label { font-size: 0.78rem; color: #aaa; display: block; margin-bottom: 3px; }
+    .modal input[type=text], .modal textarea {
+      width: 100%; padding: 7px 10px; background: #0f1a2e; border: 1px solid #0f3460;
+      border-radius: 4px; color: #e0e0e0; font-size: 0.85rem; font-family: inherit;
+    }
+    .modal textarea { resize: vertical; min-height: 70px; }
+    .modal input:focus, .modal textarea:focus { outline: none; border-color: #e2c97e; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+    .modal-actions button { padding: 5px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    .btn-primary { background: #4CAF50; color: #fff; }
+    .btn-danger  { background: #c0392b; color: #fff; }
+    .btn-cancel  { background: #0f3460; color: #aaa; border: 1px solid #0f3460 !important; }
+    .color-row   { display: flex; gap: 8px; flex-wrap: wrap; }
+    .color-swatch { width: 24px; height: 24px; border-radius: 4px; border: 2px solid transparent; cursor: pointer; }
+    .color-swatch.selected { border-color: #e2c97e; }
+
+    /* ── Boards list ── */
+    #boards-list { overflow-y: auto; max-height: 280px; display: flex; flex-direction: column; gap: 6px; }
+    .board-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #0f1a2e; border: 1px solid #0f3460; border-radius: 6px; cursor: pointer; }
+    .board-row:hover { border-color: #e2c97e; }
+    .board-row .br-title { font-size: 0.85rem; color: #e0e0e0; }
+    .board-row .br-date  { font-size: 0.7rem; color: #666; }
+    .board-row .br-del   { font-size: 0.75rem; color: #c0392b; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
+    .board-row .br-del:hover { background: #c0392b22; }
+    .list-empty { color: #555; font-size: 0.85rem; text-align: center; padding: 20px 0; }
+
+    /* ── Share bar ── */
+    #share-bar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: #16213e; border: 1px solid #e2c97e; border-radius: 8px; padding: 8px 16px; font-size: 0.8rem; color: #e2c97e; display: none; gap: 10px; align-items: center; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; z-index: 50; }
+  </style>
+</head>
+<body>
+
+<!-- Block edit modal -->
+<div id="block-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2 id="block-modal-title">✏️ Edit Block</h2>
+    <div>
+      <label>ID / Tag</label>
+      <input type="text" id="bm-id" placeholder="e.g. PROJ-001" maxlength="40" />
+    </div>
+    <div>
+      <label>Title</label>
+      <input type="text" id="bm-label" placeholder="Block title" maxlength="80" />
+    </div>
+    <div>
+      <label>Description</label>
+      <textarea id="bm-desc" placeholder="Notes, details, context…"></textarea>
+    </div>
+    <div>
+      <label>Color</label>
+      <div class="color-row" id="bm-colors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger  hidden" id="bm-delete">Delete</button>
+      <button class="btn-cancel" id="bm-cancel">Cancel</button>
+      <button class="btn-primary" id="bm-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thread edit modal -->
+<div id="thread-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>🔗 Edit Thread</h2>
+    <div>
+      <label>ID / Tag</label>
+      <input type="text" id="tm-id" placeholder="e.g. LINK-001" maxlength="40" />
+    </div>
+    <div>
+      <label>Label</label>
+      <input type="text" id="tm-label" placeholder="e.g. depends on, leads to…" maxlength="80" />
+    </div>
+    <div>
+      <label>Description</label>
+      <textarea id="tm-desc" placeholder="Why are these connected?"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger"  id="tm-delete">Delete</button>
+      <button class="btn-cancel"  id="tm-cancel">Cancel</button>
+      <button class="btn-primary" id="tm-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Boards modal -->
+<div id="boards-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>📂 Saved Boards</h2>
+    <div id="boards-list"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="boards-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <h1>🧩 Block Thread Notes</h1>
+  <input type="text" id="board-title" placeholder="Board name…" maxlength="80" value="Untitled Board" />
+  <button class="hdr-btn green"   id="btn-add-block">＋ Block</button>
+  <button class="hdr-btn"         id="btn-save">💾 Save</button>
+  <button class="hdr-btn"         id="btn-load">📂 Boards</button>
+  <button class="hdr-btn accent"  id="btn-share">🔗 Copy Link</button>
+  <button class="hdr-btn"         id="btn-new">New</button>
+  <span class="spacer"></span>
+  <span id="status-msg"></span>
+</header>
+
+<div id="canvas-wrap">
+  <svg id="dotgrid"></svg>
+  <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="toolbar">
+    <div class="tb-btn" id="tool-select"  title="Select / Move (V)">↖</div>
+    <div class="tb-btn" id="tool-connect" title="Connect blocks (C)">⬡</div>
+    <div class="tb-btn" id="btn-delete-sel" title="Delete selected (Del)">🗑</div>
+    <div class="tb-btn" id="btn-zoom-in"  title="Zoom in">＋</div>
+    <div class="tb-btn" id="btn-zoom-out" title="Zoom out">－</div>
+    <div class="tb-btn" id="btn-fit"      title="Fit to screen">⊡</div>
+  </div>
+  <div id="share-bar"></div>
+</div>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────────────────
+  const SVG_NS    = 'http://www.w3.org/2000/svg';
+  const BLOCK_W   = 160;
+  const BLOCK_H   = 70;
+  const COLORS    = ['#0f3460','#1a4a7a','#2d6a4f','#6b2737','#4a3b6b','#3d3d1a','#16213e'];
+  const LS_KEY    = 'btn_boards';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let blocks   = [];   // { id, tag, label, desc, x, y, w, h, color }
+  let threads  = [];   // { id, tag, label, desc, fromId, toId }
+  let nextBId  = 1;
+  let nextTId  = 1;
+  let selected = null; // { type: 'block'|'thread', id }
+  let zoom     = 1, panX = 0, panY = 0;
+  let dragging = null; // block drag state
+  let panning  = false, panStart = {};
+  let connectFrom = null; // block id when in connect mode
+  let tool     = 'select'; // 'select' | 'connect'
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const cvs        = document.getElementById('canvas');
+  const dotgrid    = document.getElementById('dotgrid');
+
+  // ── Utility ────────────────────────────────────────────────────────────────
+  function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function status(msg) {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // ── Dot grid ───────────────────────────────────────────────────────────────
+  function renderDotGrid() {
+    const W = dotgrid.clientWidth, H = dotgrid.clientHeight;
+    const step = 24;
+    let d = '';
+    for (let x = 0; x <= W; x += step)
+      for (let y = 0; y <= H; y += step)
+        d += `<circle cx="${x}" cy="${y}" r="1" fill="#1e2a3a"/>`;
+    dotgrid.innerHTML = d;
+  }
+
+  // ── Block center port positions ────────────────────────────────────────────
+  function blockPorts(b) {
+    return {
+      top:    { x: b.x + b.w/2,   y: b.y },
+      bottom: { x: b.x + b.w/2,   y: b.y + b.h },
+      left:   { x: b.x,           y: b.y + b.h/2 },
+      right:  { x: b.x + b.w,     y: b.y + b.h/2 },
+    };
+  }
+  function nearestPorts(a, b) {
+    const ap = blockPorts(a), bp = blockPorts(b);
+    let best = Infinity, pa = ap.right, pb = bp.left;
+    for (const [ak, av] of Object.entries(ap))
+      for (const [bk, bv] of Object.entries(bp)) {
+        const d = Math.hypot(av.x - bv.x, av.y - bv.y);
+        if (d < best) { best = d; pa = av; pb = bv; }
+      }
+    return { pa, pb };
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function render() {
+    cvs.innerHTML = '';
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+
+    // threads (drawn under blocks)
+    threads.forEach(t => {
+      const fa = blocks.find(b => b.id === t.fromId);
+      const ta = blocks.find(b => b.id === t.toId);
+      if (!fa || !ta) return;
+      const { pa, pb } = nearestPorts(fa, ta);
+      const mx = (pa.x + pb.x) / 2;
+      const cp1x = pa.x + (mx - pa.x) * 0.6, cp1y = pa.y;
+      const cp2x = pb.x - (pb.x - mx) * 0.6, cp2y = pb.y;
+      const isSel = selected?.type === 'thread' && selected?.id === t.id;
+
+      // hit-test invisible wide path
+      const hit = document.createElementNS(SVG_NS, 'path');
+      hit.setAttribute('d', `M${pa.x},${pa.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${pb.x},${pb.y}`);
+      hit.setAttribute('stroke', 'transparent');
+      hit.setAttribute('stroke-width', '16');
+      hit.setAttribute('fill', 'none');
+      hit.style.cursor = 'pointer';
+      hit.addEventListener('click', e => { e.stopPropagation(); selected = { type:'thread', id:t.id }; render(); });
+      hit.addEventListener('dblclick', e => { e.stopPropagation(); openThreadModal(t.id); });
+
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', `M${pa.x},${pa.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${pb.x},${pb.y}`);
+      path.setAttribute('stroke', isSel ? '#e2c97e' : '#4a7ab5');
+      path.setAttribute('stroke-width', isSel ? '2.5' : '1.8');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      // arrowhead
+      const angle = Math.atan2(pb.y - cp2y, pb.x - cp2x);
+      const al = 10, aw = 5;
+      const ax1 = pb.x - al * Math.cos(angle - 0.4);
+      const ay1 = pb.y - al * Math.sin(angle - 0.4);
+      const ax2 = pb.x - al * Math.cos(angle + 0.4);
+      const ay2 = pb.y - al * Math.sin(angle + 0.4);
+      const arrow = document.createElementNS(SVG_NS, 'polygon');
+      arrow.setAttribute('points', `${pb.x},${pb.y} ${ax1},${ay1} ${ax2},${ay2}`);
+      arrow.setAttribute('fill', isSel ? '#e2c97e' : '#4a7ab5');
+
+      // midpoint label
+      const midX = 0.125*pa.x + 0.375*cp1x + 0.375*cp2x + 0.125*pb.x;
+      const midY = 0.125*pa.y + 0.375*cp1y + 0.375*cp2y + 0.125*pb.y - 8;
+      if (t.label || t.tag) {
+        const bg = document.createElementNS(SVG_NS, 'rect');
+        const txt = document.createElementNS(SVG_NS, 'text');
+        txt.setAttribute('x', midX); txt.setAttribute('y', midY);
+        txt.setAttribute('text-anchor', 'middle');
+        txt.setAttribute('font-size', '10');
+        txt.setAttribute('fill', isSel ? '#e2c97e' : '#7ab0e0');
+        txt.textContent = [t.tag, t.label].filter(Boolean).join(' · ');
+        g.appendChild(path); g.appendChild(hit); g.appendChild(arrow); g.appendChild(txt);
+        return;
+      }
+      g.appendChild(path); g.appendChild(hit); g.appendChild(arrow);
+    });
+
+    // blocks
+    blocks.forEach(b => {
+      const isSel = selected?.type === 'block' && selected?.id === b.id;
+      const isConn = connectFrom === b.id;
+      const grp = document.createElementNS(SVG_NS, 'g');
+      grp.setAttribute('data-id', b.id);
+
+      // shadow
+      const shadow = document.createElementNS(SVG_NS, 'rect');
+      shadow.setAttribute('x', b.x+3); shadow.setAttribute('y', b.y+3);
+      shadow.setAttribute('width', b.w); shadow.setAttribute('height', b.h);
+      shadow.setAttribute('rx', 8); shadow.setAttribute('fill', 'rgba(0,0,0,0.4)');
+      grp.appendChild(shadow);
+
+      // body
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      rect.setAttribute('x', b.x); rect.setAttribute('y', b.y);
+      rect.setAttribute('width', b.w); rect.setAttribute('height', b.h);
+      rect.setAttribute('rx', 8);
+      rect.setAttribute('fill', b.color || '#0f3460');
+      rect.setAttribute('stroke', isConn ? '#4CAF50' : isSel ? '#e2c97e' : '#1a4a7a');
+      rect.setAttribute('stroke-width', (isSel || isConn) ? '2' : '1');
+      grp.appendChild(rect);
+
+      // tag pill
+      if (b.tag) {
+        const pill = document.createElementNS(SVG_NS, 'rect');
+        const ptxt = document.createElementNS(SVG_NS, 'text');
+        ptxt.setAttribute('x', b.x + 8); ptxt.setAttribute('y', b.y + 14);
+        ptxt.setAttribute('font-size', '9'); ptxt.setAttribute('fill', '#e2c97e');
+        ptxt.textContent = b.tag;
+        pill.setAttribute('x', b.x + 4); pill.setAttribute('y', b.y + 4);
+        pill.setAttribute('width', b.tag.length * 5.8 + 8); pill.setAttribute('height', 14);
+        pill.setAttribute('rx', 3); pill.setAttribute('fill', 'rgba(226,201,126,0.12)');
+        grp.appendChild(pill); grp.appendChild(ptxt);
+      }
+
+      // label
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', b.x + b.w/2);
+      label.setAttribute('y', b.y + (b.tag ? 34 : 26));
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '13');
+      label.setAttribute('font-weight', '600');
+      label.setAttribute('fill', '#ffffff');
+      label.textContent = b.label || 'Block';
+      grp.appendChild(label);
+
+      // description (truncated)
+      if (b.desc) {
+        const desc = document.createElementNS(SVG_NS, 'text');
+        desc.setAttribute('x', b.x + b.w/2);
+        desc.setAttribute('y', b.y + (b.tag ? 50 : 44));
+        desc.setAttribute('text-anchor', 'middle');
+        desc.setAttribute('font-size', '10');
+        desc.setAttribute('fill', '#aaa');
+        const maxLen = Math.floor(b.w / 6.5);
+        desc.textContent = b.desc.length > maxLen ? b.desc.slice(0, maxLen - 1) + '…' : b.desc;
+        grp.appendChild(desc);
+      }
+
+      // port dots (visible in connect mode)
+      if (tool === 'connect') {
+        Object.values(blockPorts(b)).forEach(p => {
+          const dot = document.createElementNS(SVG_NS, 'circle');
+          dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y); dot.setAttribute('r', 5);
+          dot.setAttribute('fill', isConn ? '#4CAF50' : '#e2c97e');
+          dot.setAttribute('stroke', '#1a1a2e'); dot.setAttribute('stroke-width', '1.5');
+          grp.appendChild(dot);
+        });
+      }
+
+      // events
+      grp.style.cursor = tool === 'connect' ? 'crosshair' : 'pointer';
+      grp.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        if (tool === 'connect') {
+          if (!connectFrom) {
+            connectFrom = b.id; render();
+          } else if (connectFrom !== b.id) {
+            const existing = threads.find(t => (t.fromId===connectFrom && t.toId===b.id) || (t.fromId===b.id && t.toId===connectFrom));
+            if (!existing) {
+              threads.push({ id: uid('t'), tag: '', label: '', desc: '', fromId: connectFrom, toId: b.id });
+            }
+            connectFrom = null; render();
+          }
+          return;
+        }
+        selected = { type: 'block', id: b.id };
+        dragging = { id: b.id, startX: e.clientX, startY: e.clientY, origX: b.x, origY: b.y };
+        render();
+      });
+      grp.addEventListener('dblclick', e => { e.stopPropagation(); openBlockModal(b.id); });
+
+      g.appendChild(grp);
+    });
+
+    cvs.appendChild(g);
+  }
+
+  // ── Pan / zoom ─────────────────────────────────────────────────────────────
+  canvasWrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoom = Math.max(0.15, Math.min(5, zoom * factor));
+    render();
+  }, { passive: false });
+
+  canvasWrap.addEventListener('mousedown', e => {
+    if (e.target === cvs || e.target === dotgrid || e.target.tagName === 'svg') {
+      if (tool === 'connect') { connectFrom = null; render(); return; }
+      panning = true;
+      panStart = { x: e.clientX - panX, y: e.clientY - panY };
+      selected = null; render();
+    }
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (panning) {
+      panX = e.clientX - panStart.x;
+      panY = e.clientY - panStart.y;
+      render(); return;
+    }
+    if (dragging) {
+      const dx = (e.clientX - dragging.startX) / zoom;
+      const dy = (e.clientY - dragging.startY) / zoom;
+      const b = blocks.find(b => b.id === dragging.id);
+      if (b) { b.x = dragging.origX + dx; b.y = dragging.origY + dy; }
+      render();
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    panning = false;
+    dragging = null;
+  });
+
+  // ── Keyboard ───────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'v' || e.key === 'V') setTool('select');
+    if (e.key === 'c' || e.key === 'C') setTool('connect');
+    if (e.key === 'n' || e.key === 'N') addBlock();
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected) deleteSel();
+    if (e.key === 'Escape') { connectFrom = null; selected = null; render(); }
+    if (e.key === 'Enter' && selected) {
+      if (selected.type === 'block')  openBlockModal(selected.id);
+      if (selected.type === 'thread') openThreadModal(selected.id);
+    }
+  });
+
+  // ── Tool switching ─────────────────────────────────────────────────────────
+  function setTool(t) {
+    tool = t;
+    connectFrom = null;
+    document.getElementById('tool-select').classList.toggle('active',  t === 'select');
+    document.getElementById('tool-connect').classList.toggle('active', t === 'connect');
+    render();
+  }
+  document.getElementById('tool-select').onclick  = () => setTool('select');
+  document.getElementById('tool-connect').onclick = () => setTool('connect');
+
+  // ── Add block ──────────────────────────────────────────────────────────────
+  function addBlock() {
+    const cx = (canvasWrap.clientWidth  / 2 - panX) / zoom - BLOCK_W / 2;
+    const cy = (canvasWrap.clientHeight / 2 - panY) / zoom - BLOCK_H / 2;
+    const b = { id: uid('b'), tag: '', label: 'New Block', desc: '', x: cx + (Math.random()-0.5)*60, y: cy + (Math.random()-0.5)*60, w: BLOCK_W, h: BLOCK_H, color: COLORS[0] };
+    blocks.push(b);
+    selected = { type: 'block', id: b.id };
+    render();
+    openBlockModal(b.id);
+  }
+  document.getElementById('btn-add-block').onclick = addBlock;
+
+  // ── Delete selected ────────────────────────────────────────────────────────
+  function deleteSel() {
+    if (!selected) return;
+    if (selected.type === 'block') {
+      blocks   = blocks.filter(b => b.id !== selected.id);
+      threads  = threads.filter(t => t.fromId !== selected.id && t.toId !== selected.id);
+    }
+    if (selected.type === 'thread') threads = threads.filter(t => t.id !== selected.id);
+    selected = null; render();
+  }
+  document.getElementById('btn-delete-sel').onclick = deleteSel;
+
+  // ── Zoom / fit ─────────────────────────────────────────────────────────────
+  document.getElementById('btn-zoom-in').onclick  = () => { zoom = Math.min(5, zoom * 1.2); render(); };
+  document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.15, zoom * 0.8); render(); };
+  document.getElementById('btn-fit').onclick = () => {
+    if (!blocks.length) { zoom = 1; panX = panY = 0; render(); return; }
+    const minX = Math.min(...blocks.map(b => b.x));
+    const minY = Math.min(...blocks.map(b => b.y));
+    const maxX = Math.max(...blocks.map(b => b.x + b.w));
+    const maxY = Math.max(...blocks.map(b => b.y + b.h));
+    const pad = 60;
+    const W = canvasWrap.clientWidth, H = canvasWrap.clientHeight;
+    zoom = Math.min(5, Math.max(0.15, Math.min(W / (maxX - minX + pad*2), H / (maxY - minY + pad*2))));
+    panX = (W - (maxX + minX) * zoom) / 2;
+    panY = (H - (maxY + minY) * zoom) / 2;
+    render();
+  };
+
+  // ── Block modal ────────────────────────────────────────────────────────────
+  let _editingBlockId = null;
+  function buildColorPicker(selectedColor) {
+    const row = document.getElementById('bm-colors');
+    row.innerHTML = '';
+    COLORS.forEach(c => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch' + (c === selectedColor ? ' selected' : '');
+      sw.style.background = c;
+      sw.dataset.color = c;
+      sw.onclick = () => {
+        row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+      };
+      row.appendChild(sw);
+    });
+  }
+  function openBlockModal(id) {
+    const b = blocks.find(b => b.id === id);
+    if (!b) return;
+    _editingBlockId = id;
+    document.getElementById('block-modal-title').textContent = '✏️ Edit Block';
+    document.getElementById('bm-id').value    = b.tag  || '';
+    document.getElementById('bm-label').value = b.label || '';
+    document.getElementById('bm-desc').value  = b.desc  || '';
+    buildColorPicker(b.color || COLORS[0]);
+    document.getElementById('bm-delete').classList.remove('hidden');
+    document.getElementById('block-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('bm-label').focus(), 50);
+  }
+  document.getElementById('bm-save').onclick = () => {
+    const b = blocks.find(b => b.id === _editingBlockId);
+    if (b) {
+      b.tag   = document.getElementById('bm-id').value.trim();
+      b.label = document.getElementById('bm-label').value.trim() || 'Block';
+      b.desc  = document.getElementById('bm-desc').value.trim();
+      const sel = document.querySelector('#bm-colors .color-swatch.selected');
+      if (sel) b.color = sel.dataset.color;
+    }
+    document.getElementById('block-modal').classList.add('hidden');
+    render();
+  };
+  document.getElementById('bm-delete').onclick = () => {
+    blocks  = blocks.filter(b => b.id !== _editingBlockId);
+    threads = threads.filter(t => t.fromId !== _editingBlockId && t.toId !== _editingBlockId);
+    selected = null;
+    document.getElementById('block-modal').classList.add('hidden');
+    render();
+  };
+  document.getElementById('bm-cancel').onclick = () => document.getElementById('block-modal').classList.add('hidden');
+
+  // ── Thread modal ───────────────────────────────────────────────────────────
+  let _editingThreadId = null;
+  function openThreadModal(id) {
+    const t = threads.find(t => t.id === id);
+    if (!t) return;
+    _editingThreadId = id;
+    document.getElementById('tm-id').value    = t.tag   || '';
+    document.getElementById('tm-label').value = t.label || '';
+    document.getElementById('tm-desc').value  = t.desc  || '';
+    document.getElementById('thread-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('tm-label').focus(), 50);
+  }
+  document.getElementById('tm-save').onclick = () => {
+    const t = threads.find(t => t.id === _editingThreadId);
+    if (t) {
+      t.tag   = document.getElementById('tm-id').value.trim();
+      t.label = document.getElementById('tm-label').value.trim();
+      t.desc  = document.getElementById('tm-desc').value.trim();
+    }
+    document.getElementById('thread-modal').classList.add('hidden');
+    render();
+  };
+  document.getElementById('tm-delete').onclick = () => {
+    threads = threads.filter(t => t.id !== _editingThreadId);
+    selected = null;
+    document.getElementById('thread-modal').classList.add('hidden');
+    render();
+  };
+  document.getElementById('tm-cancel').onclick = () => document.getElementById('thread-modal').classList.add('hidden');
+
+  // ── Serialize / Deserialize ────────────────────────────────────────────────
+  function boardState() {
+    return {
+      title:   document.getElementById('board-title').value,
+      blocks, threads, nextBId, nextTId,
+      v: 1
+    };
+  }
+  function loadState(state) {
+    if (!state || state.v !== 1) return false;
+    blocks  = state.blocks  || [];
+    threads = state.threads || [];
+    nextBId = state.nextBId || blocks.length + 1;
+    nextTId = state.nextTId || threads.length + 1;
+    document.getElementById('board-title').value = state.title || 'Untitled Board';
+    selected = null; render();
+    return true;
+  }
+
+  // ── localStorage save/load ─────────────────────────────────────────────────
+  function getBoards() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveBoards(obj) { localStorage.setItem(LS_KEY, JSON.stringify(obj)); }
+
+  document.getElementById('btn-save').onclick = () => {
+    const title = document.getElementById('board-title').value.trim() || 'Untitled Board';
+    const key   = 'board_' + title.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    const boards = getBoards();
+    boards[key] = { ...boardState(), savedAt: new Date().toISOString() };
+    saveBoards(boards);
+    status('✅ Saved: ' + title);
+  };
+
+  document.getElementById('btn-load').onclick = () => {
+    const boards = getBoards();
+    const list   = document.getElementById('boards-list');
+    list.innerHTML = '';
+    const keys = Object.keys(boards);
+    if (!keys.length) {
+      list.innerHTML = '<div class="list-empty">No saved boards yet.</div>';
+    } else {
+      keys.sort((a,b) => (boards[b].savedAt || '') > (boards[a].savedAt || '') ? 1 : -1).forEach(k => {
+        const row = document.createElement('div');
+        row.className = 'board-row';
+        const d = boards[k].savedAt ? new Date(boards[k].savedAt).toLocaleString() : '';
+        row.innerHTML = `<span class="br-title">${boards[k].title || k}</span><span class="br-date">${d}</span><span class="br-del" title="Delete">✕</span>`;
+        row.querySelector('.br-del').onclick = e => {
+          e.stopPropagation();
+          if (confirm('Delete "' + (boards[k].title || k) + '"?')) {
+            delete boards[k]; saveBoards(boards);
+            row.remove();
+            if (!document.querySelectorAll('.board-row').length)
+              list.innerHTML = '<div class="list-empty">No saved boards yet.</div>';
+          }
+        };
+        row.addEventListener('click', () => {
+          loadState(boards[k]);
+          document.getElementById('boards-modal').classList.add('hidden');
+          status('📂 Loaded: ' + (boards[k].title || k));
+        });
+        list.appendChild(row);
+      });
+    }
+    document.getElementById('boards-modal').classList.remove('hidden');
+  };
+  document.getElementById('boards-close').onclick = () => document.getElementById('boards-modal').classList.add('hidden');
+
+  // ── URL hash share / import ────────────────────────────────────────────────
+  document.getElementById('btn-share').onclick = () => {
+    try {
+      const json    = JSON.stringify(boardState());
+      const encoded = btoa(encodeURIComponent(json));
+      const url     = location.origin + location.pathname + '#b=' + encoded;
+      navigator.clipboard.writeText(url).then(() => status('🔗 Link copied to clipboard!'))
+        .catch(() => {
+          const bar = document.getElementById('share-bar');
+          bar.textContent = url;
+          bar.style.display = 'flex';
+          setTimeout(() => bar.style.display = 'none', 10000);
+        });
+    } catch(e) { status('⚠️ Board too large to encode'); }
+  };
+
+  function tryLoadFromHash() {
+    const hash = location.hash;
+    if (!hash.startsWith('#b=')) return;
+    try {
+      const json  = decodeURIComponent(atob(hash.slice(3)));
+      const state = JSON.parse(json);
+      if (loadState(state)) {
+        status('🔗 Board loaded from link!');
+        history.replaceState(null, '', location.pathname);
+      }
+    } catch(e) { console.warn('Could not load from hash', e); }
+  }
+
+  // ── New board ──────────────────────────────────────────────────────────────
+  document.getElementById('btn-new').onclick = () => {
+    if (!confirm('Start a new board? Unsaved changes will be lost.')) return;
+    blocks = []; threads = []; nextBId = 1; nextTId = 1; selected = null;
+    document.getElementById('board-title').value = 'Untitled Board';
+    zoom = 1; panX = 0; panY = 0;
+    render();
+  };
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  setTool('select');
+  renderDotGrid();
+  tryLoadFromHash();
+  render();
+  window.addEventListener('resize', () => { renderDotGrid(); render(); });
+</script>
+</body>
+</html>
